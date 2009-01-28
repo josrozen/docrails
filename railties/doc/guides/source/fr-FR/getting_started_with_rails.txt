@@ -1,38 +1,40 @@
-Getting Started With Rails
-==========================
+Débuter avec Rails
+==================
 
-This guide covers getting up and running with Ruby on Rails.  After reading it, you should be familiar with:
+Ce guide est une prise en main de Ruby on Rails.  Après sa lecture, vous devriez être familier de :
 
-* Installing Rails, creating a new Rails application, and connecting your application to a database
-* The general layout of a Rails application
-* The basic principles of MVC (Model, View Controller) and RESTful design
-* How to quickly generate the starting pieces of a Rails application.
+* l'installation de Rails, la création d'une nouvelle application Rails, et la connexion de votre application à une base de données
+* l'organisation générale d'une application Rails
+* les principes de base de MVC (Modèle, Vue, Contrôleur) et du design RESTful TODO
+* la génération rapide des pièces initiales d'une application Rails.
 
-== This Guide Assumes
 
-This guide is designed for beginners who want to get started with a Rails application from scratch. It does not assume that you have any prior experience with Rails. However, to get the most out of it, you need to have some prerequisites installed:
 
-* The link:http://www.ruby-lang.org/en/downloads/[Ruby] language
-* The link:http://rubyforge.org/frs/?group_id=126[RubyGems] packaging system
-* A working installation of link:http://www.sqlite.org/[SQLite] (preferred), link:http://www.mysql.com/[MySQL], or link:http://www.postgresql.org/[PostgreSQL]
+== Ce guide suppose
 
-It is highly recommended that you *familiarize yourself with Ruby before diving into Rails*. You will find it much easier to follow what's going on with a Rails application if you understand basic Ruby syntax. Rails isn't going to magically revolutionize the way you write web applications if you have no experience with the language it uses. There are some good free resources on the net for learning Ruby, including:
+Ce guide est conçu pour les débutants qui veulent s'initier à la création d'une application Rails. Il ne suppose aucune expérience avec Rails. Cependant, pour en bénéficier, vous devez disposer des pré-requis suivants:
+
+* le langage link:http://www.ruby-lang.org/en/downloads/[Ruby]
+* le gestionnaire de paquet link:http://rubyforge.org/frs/?group_id=126[RubyGems]
+* une installation opérationnelle de link:http://www.sqlite.org/[SQLite] (de préférence), link:http://www.mysql.com/[MySQL], ou link:http://www.postgresql.org/[PostgreSQL]
+
+Il est fortement recommandé de *vous familiariser avec Ruby avant de vous lancer dans Rails*. Vous suivrez beaucoup plus facilement ce qui se passe dans une applicaiton Rails si vous comprenez la syntaxe Ruby de base. Rails ne va pas magiquement révolutionner la façon dont vous écrivez des applications Web si vous ne connaissez pas le langage qu'il utilise. Il y a de bonnes ressources gratuites en ligne pour apprendre Ruby, par exemple:
 
 * link:http://www.humblelittlerubybook.com/[Mr. Neigborly’s Humble Little Ruby Book]
 * link:http://www.rubycentral.com/book/[Programming Ruby]
 * link:http://poignantguide.net/ruby/[Why's (Poignant) Guide to Ruby]
 
-== What is Rails?
+== Qu'est-ce que Rails?
 
-Rails is a web development framework written in the Ruby language. It is designed to make programming web applications easier by making several assumptions about what every developer needs to get started. It allows you to write less code while accomplishing more than many other languages and frameworks. Longtime Rails developers also report that it makes web application development more fun.
+Rails est un framework de développment d'applications web écrit avec le langage Ruby. Il est conçu pour faciliter la programmation d'applications web en faisant plusieurs assomptions sur ce dont tous les développeurs ont besoin pour démarrer. Il vous permet d'écrire moins de code pour accomplir plus qu'avec d'autres langages ou frameworks. Les développeur Rails expérimentés assurent également qu'il rend le développement d'applications web plus amusant.
 
-Rails is _opinionated software_. That is, it assumes that there is a best way to do things, and it's designed to encourage that best way - and in some cases discourage alternatives. If you learn "The Rails Way" you'll probably discover a tremendous increase in productivity. If you persist in bringing old habits from other languages to your Rails development, and trying to use patterns you learned elsewhere, you may have a less happy experience.
+Rails est un _logiciel caractériel_ (opinionated software). C'est à dire qu'il estime qu'il y a une meilleure façon de faire des choses et qu'il est conçu pour vous encourager à le faire ainsi (et dans certains cas décourage les alternatives). Si vous apprenez la "Voie de Rails" (Rails Way) vous augmenterez sans doute fantastiquement votre productivité. Si vous persistez à conserver vos habitudes, prises avec d'autres langages, en développant avec Rails, et essayez d'utiliser des patterns appris ailleurs, vous pourriez avoir une expérience moins agréable.
 
-The Rails philosophy includes several guiding principles:
+La philosophie de Rails comprend ces principes fondamentaux:
 
-* DRY - "Don't Repeat Yourself" - suggests that writing the same code over and over again is a bad thing.
-* Convention Over Configuration - means that Rails makes assumptions about what you want to do and how you're going to do it, rather than letting you tweak every little thing through endless configuration files.
-* REST is the best pattern for web applications - organizing your application around resources and standard HTTP verbs is the fastest way to go.
+* DRY - "Ne Vous Répétez pas (Don't Repeat Yourself)" - suggère qu'écrire le même code à plusieurs reprises est une mauvaise chose.
+* Convention Plutôt que Configuration (Convention Over Configuration) - signifie que Rails fait des assomptions sur ce que vous voulez faire et sur la façon de le faire, plutôt que de vous laisser ajuster tous les petits détails dans d'innombrables fichiers de configurations.
+* REST est le meilleur pattern pour des applications web - organiser votre application autour de ressources et de verbes HTTP standards est la méthode la plus rapide.
 
 === The MVC Architecture
 
