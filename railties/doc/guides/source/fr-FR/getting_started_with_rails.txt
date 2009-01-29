@@ -28,37 +28,36 @@ Il est fortement recommandé de *vous familiariser avec Ruby avant de vous lance
 
 Rails est un framework de développment d'applications web écrit avec le langage Ruby. Il est conçu pour faciliter la programmation d'applications web en faisant plusieurs assomptions sur ce dont tous les développeurs ont besoin pour démarrer. Il vous permet d'écrire moins de code pour accomplir plus qu'avec d'autres langages ou frameworks. Les développeur Rails expérimentés assurent également qu'il rend le développement d'applications web plus amusant.
 
-Rails est un _logiciel caractériel_ (opinionated software). C'est à dire qu'il estime qu'il y a une meilleure façon de faire des choses et qu'il est conçu pour vous encourager à le faire ainsi (et dans certains cas décourage les alternatives). Si vous apprenez la "Voie de Rails" (Rails Way) vous augmenterez sans doute fantastiquement votre productivité. Si vous persistez à conserver vos habitudes, prises avec d'autres langages, en développant avec Rails, et essayez d'utiliser des patterns appris ailleurs, vous pourriez avoir une expérience moins agréable.
+Rails est un _logiciel opiniâtre_ (opinionated software). C'est à dire qu'il estime qu'il y a une meilleure façon de faire des choses et qu'il est conçu pour vous encourager à le faire ainsi (et dans certains cas décourage les alternatives). Si vous apprenez la "Voie de Rails" (Rails Way) vous augmenterez sans doute fantastiquement votre productivité. Si vous persistez à conserver vos habitudes, prises avec d'autres langages, en développant avec Rails, et essayez d'utiliser des patterns appris ailleurs, vous pourriez avoir une expérience moins agréable.
 
 La philosophie de Rails comprend ces principes fondamentaux:
 
-* DRY - "Ne Vous Répétez pas (Don't Repeat Yourself)" - suggère qu'écrire le même code à plusieurs reprises est une mauvaise chose.
+* DRY - "Don't Repeat Yourself" (Ne Vous Répétez pas) - suggère qu'écrire le même code à plusieurs reprises est une mauvaise chose.
 * Convention Plutôt que Configuration (Convention Over Configuration) - signifie que Rails fait des assomptions sur ce que vous voulez faire et sur la façon de le faire, plutôt que de vous laisser ajuster tous les petits détails dans d'innombrables fichiers de configurations.
 * REST est le meilleur pattern pour des applications web - organiser votre application autour de ressources et de verbes HTTP standards est la méthode la plus rapide.
 
-=== The MVC Architecture
+=== L'architecture MVC
 
-Rails is organized around the Model, View, Controller architecture, usually just called MVC. MVC benefits include:
+Rails est organisé autour de l'architecture modèle Modèle, Vue, Contrôleur, habituellement appelée simplement MVV. Les bénéfices de MVC comprennent:
 
-* Isolation of business logic from the user interface
-* Ease of keeping code DRY
-* Making it clear where different types of code belong for easier maintenance
+* la séparation de la logique métier de l'interface utilisateur.
+* la tendance naturelle à ne pas se répéter (DRY)
+* l'évidence de l'emplacement des différents types de code pour une maintenance facilitée.   
 
-==== Models
+==== Modèles
+Un modèle représente l'information (les données) d'une application et les règles pour la manipuler. Dans le cas de Rails, les modèles sont d'abord utilisés pour gérer les interactions avec les tables dans une base de données. Le plus souvent une table dans votre base correspond à un modèle dans l'application. L'essentiel de la logique métier de votre application est concentré dans les modèles.
 
-A model represents the information (data) of the application and the rules to manipulate that data. In the case of Rails, models are primarily used for managing the rules of interaction with a corresponding database table. In most cases, one table in your database will correspond to one model in your application. The bulk of your application's business logic will be concentrated in the models.
+==== Vues
 
-==== Views
+Les vues sont l'interface utilisateur de votre application. En Rails, les vues sont souvent des fichiers HTML contenant du code Ruby dédié à la présentation des données. Les vues ont la responsabilité de fournir des données au navigateur, ou aux autres outils utilisés pour faire des requêtes à votre application.
 
-Views represent the user interface of your application. In Rails, views are often HTML files with embedded Ruby code that performs tasks related solely to the presentation of the data. Views handle the job of providing data to the web browser or other tool that is used to make requests from your application.
+==== Contrôleurs
 
-==== Controllers
+Les contrôleurs constituent la "colle" entre les modèles et les vues. En Rails les contrôleurs sont responsables du traitement des requètes entrantes en provenance du navigateur.
 
-Controllers provide the "glue" between models and views. In Rails, controllers are responsible for processing the incoming requests from the web browser, interrogating the models for data, and passing that data on to the views for presentation.
+=== Les composants de Rails
 
-=== The Components of Rails
-
-Rails provides a full stack of components for creating web applications, including:
+Rails fournit une pile complète de composants pour créer des applications web, notamment:
 
 * Action Controller
 * Action View
@@ -70,68 +69,68 @@ Rails provides a full stack of components for creating web applications, includi
 
 ==== Action Controller
 
-Action Controller is the component that manages the controllers in a Rails application. The Action Controller framework processes incoming requests to a Rails application, extracts parameters, and dispatches them to the intended action. Services provided by Action Controller include session management, template rendering, and redirect management.
+Action Controller est le composant qui gère les contrôleurs dans une applicaion Rails. Le framework d'Action Controller framework traite les demandes entrantes, extrait les paramètres, et les affecte aux actions correspondantes. Les services fournis par Action Controller comprennent la gestion des sessions, le rendu des templates, et la gestion des redirections.
 
 ==== Action View
 
-Action View manages the views of your Rails application. It can create both HTML and XML output by default. Action View manages rendering templates, including nested and partial templates, and includes built-in AJAX support.
+Action View gère les vues de votre applications Rails. Il peut générer HTML ou XML par défaut. Action View gère les templates de rendu, y compris ceux emboîtés (nested) ou partiels, et supporte nativement AJAX.
 
 ==== Active Record
 
-Active Record is the base for the models in a Rails application. It provides database independence, basic CRUD functionality, advanced finding capabilities, and the ability to relate models to one another, among other services.
+Active Record est la base des modèles des applications Rails. Il permet une indépendance par rapport aux bases de données, fournit les fonctionnalités de base CRUD, des capacités avancées de recherche, et la capacité de relier les modèles les uns aux autres, entre autres services.
 
 ==== Action Mailer
 
-Action Mailer is a framework for building e-mail services. You can use Action Mailer to send emails based on flexible templates, or to receive and process incoming email.
+Action Mailer est un framework pour construire des services de messagerie. Action Mailer permet d'envoyer des emails basés sur des templates flexibles, ou de recevoir et de traiter des emails entrants.
 
 ==== Active Resource
 
-Active Resource provides a framework for managing the connection between business objects an RESTful web services. It implements a way to map web-based resources to local objects with CRUD semantics.
+Active Resource fournit un framework pour gérer la connexion entre des objects métiers et des services web RESTful. Il implémente une façon de relier des ressources web à des objets locaux avec une sémantique CRUD.
 
 ==== Railties
 
-Railties is the core Rails code that builds new Rails applications and glues the various frameworks together in any Rails application.
+Railties est le noyau (core) de code de Rails qui construit toutes les applications Rails en assemblant les différents frameworks.
 
 ==== Active Support
 
-Active Support is an extensive collection of utility classes and standard Ruby library extensions that are used in the Rails, both by the core code and by your applications. 
+Active Support est un vaste ensemble de classes utilitaires et d'extensions à la bibliothèque standard de Ruby qui sont utilisés en Rails, tant par le noyau que vos applications. 
 
 === REST
 
-The foundation of the RESTful architecture is generally considered to be Roy Fielding's doctoral thesis, link:http://www.ics.uci.edu/~fielding/pubs/dissertation/top.htm[Architectural Styles and the Design of Network-based Software Architectures]. Fortunately, you need not read this entire document to understand how REST works in Rails. REST, an acronym for Representational State Transfer, boils down to two main principles for our purposes:
+Le fondement de l'architecture RESTful est généralement considéré être la thèse doctorale de Roy Fielding, link:http://www.ics.uci.edu/~fielding/pubs/dissertation/top.htm[Architectural Styles and the Design of Network-based Software Architectures]. Heureusement, vous n'avez pas vraiment besoin de lire l'intégralité de ce document pour comprendre comment REST fonctionne dans Rails. REST, acronyme de Representational State Transfer, se réduit à deux principes pour notre propos:
 
-* Using resource identifiers (which, for the purposes of discussion, you can think of as URLs) to represent resources
-* Transferring representations of the state of that resource between system components. 
+* l'utilisation d'identificateurs de ressources (que, dans le cadre de ce document, vous pouvez considérer être des URLs) pour représenter des ressources
+* le transfert de représentations de l'état de cette ressource entre composants d'un système. 
 
-For example, to a Rails application a request such as this:
+Par exemple, pour une application Rails une requète telle que:
 
 +DELETE /photos/17+
 
-would be understood to refer to a photo resource with the ID of 17, and to indicate a desired action - deleting that resource. REST is a natural style for the architecture of web applications, and Rails makes it even more natural by using conventions to shield you from some of the RESTful complexities.
+serait comprise comme la référence d'une ressource photo avec l'ID 17, et l'indication d'une action désirée (la suppression de cette ressource). REST est un style naturelle pour l'architecture d'application web, et Rails le rend encore plus naturel grâce à ses conventions qui vous isole de certaines complexités de l'architecture RESTful.
 
-If you’d like more details on REST as an architectural style, these resources are more approachable than Fielding’s thesis:
+Si vous souhaitez plus de détails sur le style architectural REST, ces ressources sont plus accessibles que la thèse de Fielding:
 
-* link:http://www.infoq.com/articles/rest-introduction[A Brief Introduction to REST] by Stefan Tilkov
-* link:http://bitworking.org/news/373/An-Introduction-to-REST[An Introduction to REST] (video tutorial) by Joe Gregorio
-* link:http://en.wikipedia.org/wiki/Representational_State_Transfer[Representational State Transfer] article in Wikipedia
+* link:http://www.infoq.com/articles/rest-introduction[A Brief Introduction to REST] par Stefan Tilkov
+* link:http://bitworking.org/news/373/An-Introduction-to-REST[An Introduction to REST] (didacticiel vidéo) par Joe Gregorio
+* link:http://en.wikipedia.org/wiki/Representational_State_Transfer[Representational State Transfer] article Wikipedia
 
-== Creating a New Rails Project
+== Création d'un nouveau projet Rails
 
-If you follow this guide, you'll create a Rails project called +blog+, a (very) simple weblog. Before you can start building the application, you need to make sure that you have Rails itself installed.
+En suivant ce guide, vous créerez un projet Rails appelé +blog+, un weblog (très) simple. Avant de pouvoir construire l'application, vous devez vérifier que Rails est bien installé.
 
-=== Installing Rails
+=== Installation de Rails
 
-In most cases, the easiest way to install Rails is to take advantage of RubyGems:
+Le plus souvent, la façon la plus simple d'installer Rails est d'utiliser RubyGems:
 
 [source, shell]
 -------------------------------------------------------
 $ gem install rails
 -------------------------------------------------------
 
-NOTE: There are some special circumstances in which you might want to use an alternate installation strategy:
+NOTE: Des circonstances particulières pourraient vous faire préférer des méthodes alternatives:
 
-* If you're working on Windows, you may find it easier to install link:http://instantrails.rubyforge.org/wiki/wiki.pl[Instant Rails]. Be aware, though, that Instant Rails releases tend to lag seriously behind the actual Rails version. Also, you will find that Rails development on Windows is overall less pleasant than on other operating systems. If at all possible, we suggest that you install a Linux virtual machine and use that for Rails development, instead of using Windows.
-* If you want to keep up with cutting-edge changes to Rails, you'll want to clone the link:http://github.com/rails/rails/tree/master[Rails source code] from github. This is not recommended as an option for beginners, though.
+* Si vous travaillez sous Windows, vous trouvez peut-être plus simple d'installer  link:http://instantrails.rubyforge.org/wiki/wiki.pl[Instant Rails]. Soyez cependant conscient qu'Instant Rails tends à prendre du retard par rapport à la version courante de Rails. Vous remarquerez aussi que le développement Rails sous Windows est une expérience généralement moins satisfaisante qu'avec d'autres systèmes d'exploitation. Si cela est possible, nous vous suggérons l'installation d'une machine Linux virtuelle et son utilisation pour vos développements, plutôt que directement Windows.
+* Si vous souhaitez rester sur le fil des changements du framework Rails, vous préférerez cloner le  link:http://github.com/rails/rails/tree/master[code source] depuis github. Ceci dit, ce n'est pas une option recommandée pour les débutants.
 
 === Creating the Blog Application
 
