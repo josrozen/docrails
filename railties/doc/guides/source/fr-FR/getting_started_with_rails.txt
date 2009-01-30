@@ -182,20 +182,20 @@ Rails crée en effet un répertoire dans votre répertoire de travail avec le no
 |+vendor/+		|Destiné au code complémentaire. Dans une application Rails typique, cela comprend Ruby Gems, le code source de Rails (si vous l'installez dans votre projet) et les plugins contenant des fonctionnalités additionnelles packagées.
 |==========================================================================================================
 
-=== Configuring a Database
+=== Configuration de la base de données
 
-Just about every Rails application will interact with a database. The database to use is specified in a configuration file, +config/database.yml+.
-If you open this file in a new Rails application, you'll see a default database configuration using SQLite. The file contains sections for three different environments in which Rails can run by default:
+Presque toutes les applications Rails interagissent avec une base de données ; la base utilisée est spécifiée dans un fichier de configuration, +config/database.yml+.
+Si vous ouvrez ce fichier pour une application qui vient d'être générée, vous voyez une configuration de base de données par défaut pour SQLite. Ce fichier contient de sections pour 3 différents environnements d'exécution pour Rails:
 
-* The +development+ environment is used on your development computer as you interact manually with the application
-* The +test+ environment is used to run automated tests
-* The +production+ environment is used when you deploy your application for the world to use.
+* L'environnement +développement+ est utilisé sur votre machine de développement où vous interagissez directement avec l'application
+* L'environnment +test+ est utilisé pour exécuter les tests automatisés
+* L'environnement +production+ est utilisé pour déployer votre application pour son accès par le reste du monde.
 
-==== Configuring a SQLite Database
+==== Configuration d'une base de données SQLite
 
-Rails comes with built-in support for link:http://www.sqlite.org/[SQLite], which is a lightweight serverless database application. While a busy production environment may overload SQLite, it works well for development and testing. Rails defaults to using a SQLite database when creating a new project, but you can always change it later.
+Rails supporte nativement link:http://www.sqlite.org/[SQLite], qui est un gestionnaire de base de données légère sans besoin de serveur. Si un environnement de production peut surcharger SQLite, il suffit pour le développement et les tests. Rails utilise par défaut une base de données SQLite à la création d'un nouveau projet, mais vous pouvez toujours le changer plus tard.
 
-Here's the section of the default configuration file with connection information for the development environment:
+Voici la section d'un fichier de configuration par défaut avec les informations de connexion pour l'environnement de développement:
 
 [source, ruby]
 -------------------------------------------------------
@@ -205,18 +205,18 @@ development:
   timeout: 5000
 -------------------------------------------------------
 
-If you don't have any database set up, SQLite is the easiest to get installed. If you're on OS X 10.5 or greater on a Mac, you already have it. Otherwise, you can install it using RubyGems:
+Si vous n'avez pas de moteur de base de données installées, SQLite est le plus simple à installer. Si vous utilisez OS X 10.5+ sur un Mac vous l'avez déjà. Sinon vous pouvez l'installer avec RubyGems. 
 
-If you're not running OS X 10.5 or greater, you'll need to install the SQLite gem.  Similar to installing Rails you just need to run:
+Si vous n'utilisez pas OS X 10.5+ vous devez installer la gem SQLite.  De la même façon que pour Rails il vous suffit de taper:
 
 [source, shell]
 -------------------------------------------------------
 $ gem install sqlite3-ruby
 -------------------------------------------------------
 
-==== Configuring a MySQL Database
+==== Configuration d'une base de données MySQL
 
-If you choose to use MySQL, your +config/database.yml+ will look a little different. Here's the development section:
+Si vous choisissez MySQL, votre +config/database.yml+ sera un peu différent. Voici la section pour l'environnement de développement:
 
 [source, ruby]
 -------------------------------------------------------
@@ -228,11 +228,11 @@ development:
   password:
   socket: /tmp/mysql.sock
 -------------------------------------------------------
-If your development computer's MySQL installation includes a root user with an empty password, this configuration should work for you. Otherwise, change the username and password in the +development+ section as appropriate.
+Si l'installation de MySQL sur votre machine de développement a un utilisateur root sans password, cette configuration vous convient. Sinon, changez l'utilisateur et le password dans cette section +development+.
 
-==== Configuring a PostgreSQL Database
+==== Configuration d'une base de données PostgreSQL
 
-If you choose to use PostgreSQL, your +config/database.yml+ will be customized to use PostgreSQL databases:
+Si vous choisissez PostgreSQL, votre +config/database.yml+ sera adaptée pour l'utiliser :
 
 [source, ruby]
 -------------------------------------------------------
@@ -244,11 +244,11 @@ development:
   password:
 -------------------------------------------------------
 
-Change the username and password in the +development+ section as appropriate.
+Changez l'utilisateur et le password dans cette section +development+ si nécessaire.
 
-==== Creating the Database
+==== Création de la base de données
 
-Now that you have your database configured, it's time to have Rails create an empty database for you. You can do this by running a rake command:
+Maintenant que vous avez configuré la base de données, Il vous faut demander à Rails de créer une base vide pour vous. Vous pouvez faire cela en exécutant une commande rake:
 
 [source, shell]
 -------------------------------------------------------
