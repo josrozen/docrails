@@ -255,18 +255,18 @@ Maintenant que vous avez configuré la base de données, Il vous faut demander �
 $ rake db:create
 -------------------------------------------------------
 
-== Hello, Rails!
+== Bonjour Rails!
 
-One of the traditional places to start with a new language is by getting some text up on screen quickly. To do that in Rails, you need to create at minimum a controller and a view. Fortunately, you can do that in a single command. Enter this command in your terminal:
+L'un des classiques des début avec un nouveau langage est l'affichage d'un texte sur un écran. Pour faire ça en Rails, vous devez créer au minimum un contrôleur et une vue. Heureusement, vous pouvez faire cela d'une seule commande. Tapez cette commande dans la console:
 
 [source, shell]
 -------------------------------------------------------
 $ script/generate controller home index
 -------------------------------------------------------
 
-TIP: If you're on Windows, or your Ruby is set up in some non-standard fashion, you may need to explicitly pass Rails +script+ commands to Ruby: +ruby script/generate controller home index+.
+ASTUCE: Si vous utilisez Windows, où si votre installation de Ruby n'est pas standard, il se peut qu'il soit nécessaire de passer explicitement les commandes +script+ de Rails à Ruby: +ruby script/generate controller home index+.
 
-Rails will create several files for you, including +app/views/home/index.html.erb+. This is the template that will be used to display the results of the +index+ action (method) in the +home+ controller. Open this file in your text editor and edit it to contain a single line of code:
+Rails va créer plusieurs fichiers pour vous, dont +app/views/home/index.html.erb+. C'est la matrice que vous allez utiliser pour afficher les resultats de l'action (la méthode) +index+ dans votre contrôleur +home+. Ouvrez ce fichier dans éditeur de texte et modifiez le pour qu'il contienne une seule ligne de code :
 
 [source, html]
 -------------------------------------------------------
