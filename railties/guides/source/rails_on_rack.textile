@@ -32,7 +32,7 @@ h4. Rails Application's Rack Object
 
 h4. script/server
 
-<tt>script/server</tt> does the basic job of creating a +Rack::Builder+ object and starting the webserver. This is Rails equivalent of Rack's +rackup+ script.
+<tt>script/server</tt> does the basic job of creating a +Rack::Builder+ object and starting the webserver. This is Rails' equivalent of Rack's +rackup+ script.
 
 Here's how +script/server+ creates an instance of +Rack::Builder+
 
@@ -50,7 +50,7 @@ app = Rack::Builder.new {
 
 Middlewares used in the code above are primarily useful only in the development envrionment. The following table explains their usage:
 
-|Middleware|Purpose|
+|_.Middleware|_.Purpose|
 |Rails::Rack::LogTailer|Appends log file output to console|
 |Rails::Rack::Static|Serves static files inside +RAILS_ROOT/public+ directory|
 |Rails::Rack::Debugger|Starts Debugger|
@@ -84,7 +84,7 @@ h3. Action Controller Middleware Stack
 
 Many of Action Controller's internal components are implemented as Rack middlewares. +ActionController::Dispatcher+ uses +ActionController::MiddlewareStack+ to combine various internal and external middlewares to form a complete Rails Rack application.
 
-NOTE: +ActionController::MiddlewareStack+ is Rails equivalent of +Rack::Builder+, but built for better flexibility and more features to meet Rails' requirements.
+NOTE: +ActionController::MiddlewareStack+ is Rails' equivalent of +Rack::Builder+, but built for better flexibility and more features to meet Rails' requirements.
 
 h4. Inspecting Middleware Stack
 
@@ -113,7 +113,7 @@ Purpose of each of this middlewares is explained in "Internal Middlewares":#inte
 
 h4. Configuring Middleware Stack
 
-Rails provides a simple configuration interface +config.middleware+ for adding, removing and modifying the middlewares in the middleware stack via +environment.rb+ or the environment specific configuarion file <tt>environments/&lt;environment&gt;.rb</tt>.
+Rails provides a simple configuration interface +config.middleware+ for adding, removing and modifying the middlewares in the middleware stack via +environment.rb+ or the environment specific configuration file <tt>environments/&lt;environment&gt;.rb</tt>.
 
 h5. Adding a Middleware
 
@@ -157,7 +157,7 @@ h4. Internal Middleware Stack
 
 Much of Action Controller's functionality is implemented as Middlewares. The following table explains the purpose of each of them:
 
-|Middleware|Purpose|
+|_.Middleware|_.Purpose|
 |Rack::Lock|Sets +env["rack.multithread"]+ flag to +true+ and wraps the application within a Mutex.|
 |ActionController::Failsafe|Returns HTTP Status +500+ to the client if an exception gets raised while dispatching.|
 |ActiveRecord::QueryCache|Enable the Active Record query cache.|
