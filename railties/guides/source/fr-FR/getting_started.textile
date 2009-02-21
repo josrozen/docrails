@@ -152,7 +152,7 @@ Ou encore, si c'est PostgreSQL qui stocke vos données, cette commande :
 $ rails blog -d postgresql
 </shell>
 
-TIP: Les options que le constructeur d'application de Rails acceptent sont visibles à l'aide de <tt>rails -h</tt>.
+TIP. Les options que le constructeur d'application de Rails acceptent sont visibles à l'aide de <tt>rails -h</tt>.
 
 Après la création de l'application blog, naviguez dans son répertoire et continuez à travailler directement dans cette application :
 
@@ -173,7 +173,7 @@ Rails crée en effet un répertoire dans votre répertoire de travail avec le no
 |log/|Fichiers de log.|
 |public/|Le seul répertoire vu tel quel. C'est là que vos images, votre javascript, vos feuilles de style (CSS) et d'autres fichiers statiques doivent se trouver.|
 |script/|Scripts fournis par Rails pour des tâches récurrentes : benchmarking, installation de plugin, ainsi que le démarrage de la console ou du serveur web.|
-|test/|Tests unitaires, fixtures, et apparatus de test. Ce sujet est traité dans "Test des Applications Rails":../testing_rails_applications.html
+|test/|Tests unitaires, fixtures, et dispositif de test. Ce sujet est traité dans "Test des Applications Rails":../testing_rails_applications.html
 |tmp/|Fichiers temporaires|
 |vendor/|Destiné au code complémentaire. Dans une application Rails typique, cela comprend Ruby Gems, le code source de Rails (s'il est installé dans le projet) et les plugins contenant des fonctionnalités additionnelles packagées.|
 
@@ -257,7 +257,7 @@ L'un des classiques des début avec un nouveau langage est l'affichage d'un text
 $ script/generate controller home index
 </shell>
 
-TIP: Si vous utilisez Windows, où si votre installation de Ruby n'est pas standard, il se peut qu'il soit nécessaire de passer explicitement les commandes +script+ de Rails à Ruby: +ruby script/generate controller home index+.
+TIP. Si vous utilisez Windows, où si votre installation de Ruby n'est pas standard, il se peut qu'il soit nécessaire de passer explicitement les commandes +script+ de Rails à Ruby: +ruby script/generate controller home index+.
 
 Rails va créer plusieurs fichiers pour vous, dont +app/views/home/index.html.erb+. C'est la matrice que vous allez utiliser pour afficher les resultats de l'action (la méthode) +index+ dans votre contrôleur +home+. Ouvrez ce fichier dans éditeur de texte et modifiez le pour qu'il contienne une seule ligne de code :
 
@@ -452,7 +452,7 @@ title: nil, content: "A new post", created_at: nil, updated_at: nil>,
 
 Ce code montre la création d'une nouvelle instance d'un +Post+, une tentative de sauvegarde et l'obtention d'un +false+ en retour, indiquant un échec, puis l'inspection des +errors+ du Post.
 
-TIP: Contrairement au serveur web de développement, la console ne rafraîchit pas automatiquement votre code à chaque ligne. Si vous faîtes des changements à vos modèles alors que la console est ouverte, tapez +reload!+ au prompt pour les recharger.
+TIP. Contrairement au serveur web de développement, la console ne rafraîchit pas automatiquement votre code à chaque ligne. Si vous faîtes des changements à vos modèles alors que la console est ouverte, tapez +reload!+ au prompt pour les recharger.
 
 h4. Liste de tous les Posts
 
@@ -471,7 +471,7 @@ end
 
 Ce code initialise la variable d'instance +@posts+ avec un tableau de tous les posts dans la table. +Post.find(:all)+ ou +Post.all+ demande au modèle +Post+ de retourner tous les posts dans la table, sans condition.
 
-TIP: Pour plus d'information sur la recherche d'enregistrements avec Active Record, consultez "Active Record Finders":finders.html.
+TIP. Pour plus d'information sur la recherche d'enregistrements avec Active Record, consultez "Active Record Finders":finders.html.
 
 Le block +respond_to+ gère à la fois les appels HTML et XML à cette action. En navigant à +http://localhost:3000/posts.xml+, vous verrez tous les posts au format XML. Le format HTML utilise une vue dans +app/views/posts/+ dont le nom correspond à l'action. Rails met toutes les variables d'instance de l'action à la disposition de la vue. Voici +app/view/posts/index.html.erb+:
 
@@ -583,7 +583,7 @@ La vue +new.html.erb+ affiche ce Post vide :
 
 Le bloc +form_for+ est utilisé pour créer un formulaire HTML. Dans ce bloc vous avez accès à des méthodes pour construire différents contrôles dans le formulaire. Par exemple, +f.text_field :name+ demande à Rails de créer un champ de saisie de texte dans le formulaire, et de le faire correspondre à l'attribut +name+ de l'instance affichée. Vous ne pouvez utiliser ces méthodes qu'avec les attributs du modèle sur lequel est basé ce formulaire (ici +name+, +title+, et +content+). Rails préfère +form_for+ plutôt que du HTML brut d'une part parce que le code est plus succinct, et d'autre part parce que cela lie explicitement le formulaire à une instance d'un modèle.
 
-TIP: Si vous avez besoin de créer un formulaire HTML qui affiche des champs arbitraires, non liés à un modèle, vous devriez utiliser la méthode +form_tag+, qui fournit les raccourcis nécessaires à ces formulaires indépendants d'un modèle.
+TIP. Si vous avez besoin de créer un formulaire HTML qui affiche des champs arbitraires, non liés à un modèle, vous devriez utiliser la méthode +form_tag+, qui fournit les raccourcis nécessaires à ces formulaires indépendants d'un modèle.
 
 Quant vous cliquez sur le bouton +Create+ de ce fomulaire, le navigateur renvoie des informations à la méthode +create+ du contrôleur (Rails sait qu'il faut appeler la méthode +create+ car le formulaire est envoyée par une requète HTTP POST ; c'est une des conventions déjà mentionnées) :
 
@@ -847,26 +847,26 @@ Rails exécute les _before filters_ avant toute action dans le contrôleur. La c
 
 Pour plus d'information sur les partials, voir le guide "Action Controller Basics":actioncontroller_basics.html.
 
-h3. Adding a Second Model
+h3. Ajout d'un second modèle
 
-Now that you've seen what's in a model built with scaffolding, it's time to add a second model to the application. The second model will handle comments on blog posts.
+Maintenant que vous savez de quoi est fait un modèle scaffoldé, il est temps d'ajouter un second modèle à l'application. Il va gérer les commentaires sur les posts du blog.
 
-h4. Generating a Model
+h4. Génération d'un modèle
 
-Models in Rails use a singular name, and their corresponding database tables use a plural name. For the model to hold comments, the convention is to use the name Comment. Even if you don't want to use the entire apparatus set up by scaffolding, most Rails developers still use generators to make things like models and controllers. To create the new model, run this command in your terminal:
+Les modèles dans Rails utilisent un nom singulier, et les tables correspondantes utilisent un pluriel. Pour un modèle qui doit contenir des commentaires, la convention est d'utiliser le nom Comment (ici en anglais dans le code). Même sans utiliser le dispositif complet du scaffolding, la plupart des développeurs Rails utilisent des générateurs pour les modèles ou les contrôleurs. Pour créer le nouveau modèle, il suffit de taper cette commande dans une console :
 
 <shell>
 $ script/generate model Comment commenter:string body:text
     post:references
 </shell>
 
-This command will generate four files:
+Cette commande génère les quatre fichiers :
 
-* +app/models/comment.rb+ - The model
-* +db/migrate/20091013214407_create_comments.rb+ - The migration
-* +test/unit/comment_test.rb+ and +test/fixtures/comments.yml+ - The test harness.
+* +app/models/comment.rb+ - le modèle
+* +db/migrate/20091013214407_create_comments.rb+ - la migration
+* +test/unit/comment_test.rb+ and +test/fixtures/comments.yml+ - l'armature des tests.
 
-First, take a look at +comment.rb+:
+D'abord +comment.rb+:
 
 <ruby>
 class Comment < ActiveRecord::Base
@@ -874,9 +874,9 @@ class Comment < ActiveRecord::Base
 end
 </ruby>
 
-This is very similar to the +post.rb+ model that you saw earlier. The difference is the line +belongs_to :post+, which sets up an Active Record _association_. You'll learn a little about associations in the next section of this guide.
+C'est très similaire au modèle +post.rb+ vu précédemment. La différence vient de la ligne +belongs_to :post+, qui met en place une _association_ Active Record. Vous en apprendrez un peu plus sur les associations dans la prochaine section de ce guide.
 
-In addition to the model, Rails has also made a migration to create the corresponding database table:
+En plus du model, Rails a aussi créé une migration pour créer la table correspondante dans la base :
 
 <ruby>
 class CreateComments < ActiveRecord::Migration
@@ -896,22 +896,22 @@ class CreateComments < ActiveRecord::Migration
 end
 </ruby>
 
-The +t.references+ line sets up a foreign key column for the association between the two models. Go ahead and run the migration:
+La ligne +t.references+ crée une clef étrangère ("foreign key") pour l'association entre les modèles. Pour exécuter la migration, il faut taper:
 
 <shell>
 $ rake db:migrate
 </shell>
 
-Rails is smart enough to only execute the migrations that have not already been run against the current database.
+Rails est suffisament futé pour n'appliquer que les migrations qui n'ont pas été exécutées sur la base de données courante.
 
-h4. Associating Models
+h4. Association de modèles
 
-Active Record associations let you easily declare the relationship between two models. In the case of comments and posts, you could write out the relationships this way:
+Les associations d'Active Record permettent de déclarer facilement des relations entre 2 modèles. Dans le cas de comments et de posts, la relations peut s'écrire ainsi :
 
-* Each comment belongs to one post
-* One post can have many comments
+* Chaque comment appartient à un post
+* Un post peut avoir plusieurs comments
 
-In fact, this is very close to the syntax that Rails uses to declare this association. You've already seen the line of code inside the Comment model that makes each comment belong to a Post:
+En fait c'est très proche de la syntaxe utilisée par Rails pour déclarer cette association. Vous avez déjà vu la ligne de code du modèle Comment qui indique que chaque Comment appartient à un Post:
 
 <ruby>
 class Comment < ActiveRecord::Base
@@ -919,7 +919,7 @@ class Comment < ActiveRecord::Base
 end
 </ruby>
 
-You'll need to edit the +post.rb+ file to add the other side of the association:
+Vous devez modfier le fichier +post.rb+ pour indiquer l'autre aspect de cette association :
 
 <ruby>
 class Post < ActiveRecord::Base
@@ -929,41 +929,41 @@ class Post < ActiveRecord::Base
 end
 </ruby>
 
-These two declarations enable a good bit of automatic behavior. For example, if you have an instance variable +@post+ containing a post, you can retrieve all the comments belonging to that post as the array +@post.comments+.
+Ces 2 déclarations permettent de disposer automatiquement de comportements. Par exemple, étant donné une variable d'instance +@post+ contenant un post, tous les comments appartenant à ce post s'obtiennent dans le tableau +@post.comments+.
 
-TIP: For more information on Active Record associations, see the "Active Record Associations":association_basics.html guide.
+TIP. Pour plus d'information sur les associations Active Record, voir le guide "Active Record Associations":association_basics.html.
 
-h4. Adding a Route
+h4. Ajout d'une route
 
-_Routes_ are entries in the +config/routes.rb+ file that tell Rails how to match incoming HTTP requests to controller actions. Open up that file and find the existing line referring to +posts+ (it will be right at the top of the file). Then edit it as follows:
+Les _routes_ sont des entrées du fichier +config/routes.rb+ qui indique Rails comment faire correspondre des requètes entrantes HTTP à des actions dans des contrôleurs. Ouvrez ce fichier et retrouvez la ligne qui fait référence aux +posts+ (au début du fichier). Puis modifiez la ainsi:
 
 <ruby>
 map.resources :posts, :has_many => :comments
 </ruby>
 
-This creates +comments+ as a _nested resource_ within +posts+. This is another part of capturing the hierarchical relationship that exists between posts and comments.
+Cela crée +comments+ en tant que _resource imbriquée_ ("nested resource") dans +posts+, un autre aspect de la relation hiérarchique qui existe entre les posts et les commentaires.
 
-TIP: For more information on routing, see the "Rails Routing from the Outside In":routing_outside_in.html guide.
+TIP. Pour plus d'information sur le routage, voir le guide "Rails Routing from the Outside In":routing_outside_in.html.
 
-h4. Generating a Controller
+h4. Génération d'un contrôleur
 
-With the model in hand, you can turn your attention to creating a matching controller. Again, there's a generator for this:
+Pour ce modèle, il faut maintenant générer un contrôleur correspondant. A nouveau à l'aide d'un générateur :
 
 <shell>
 $ script/generate controller Comments index show new edit
 </shell>
 
-This creates seven files:
+Ce qui crée sept fichiers:
 
-* +app/controllers/comments_controller.rb+ - The controller
-* +app/helpers/comments_helper.rb+ - A view helper file
-* +app/views/comments/index.html.erb+ - The view for the index action
-* +app/views/comments/show.html.erb+ - The view for the show action
-* +app/views/comments/new.html.erb+ - The view for the new action
-* +app/views/comments/edit.html.erb+ - The view for the edit action
-* +test/functional/comments_controller_test.rb+ - The functional tests for the controller
+* +app/controllers/comments_controller.rb+ - le contrôleur
+* +app/helpers/comments_helper.rb+ - Un fichier heleper pour la vue
+* +app/views/comments/index.html.erb+ - La vue pour l'action index
+* +app/views/comments/show.html.erb+ - La vue pour l'action show
+* +app/views/comments/new.html.erb+ - La vue pour l'action new
+* +app/views/comments/edit.html.erb+ - La vue pour l'action indexedit
+* +test/functional/comments_controller_test.rb+ - Les tests fonctionnels pour le contrôleur
 
-The controller will be generated with empty methods and views for each action that you specified in the call to +script/generate controller+:
+Le contrôleur est généré avec des méthodes et des vues vides pour chacune des actions spécifiées lors de l'appel du générateur :
 
 <ruby>
 class CommentsController < ApplicationController
@@ -982,7 +982,7 @@ class CommentsController < ApplicationController
 end
 </ruby>
 
-You'll need to flesh this out with code to actually process requests appropriately in each method. Here's a version that (for simplicity's sake) only responds to requests that require HTML:
+Il faut donc maintenant enrichir cet armature avec le code qui va effectivement traiter les requètes dans les actions correspondantes. Voici une version de ce code, en ne répondant, par souci de simplicité, qu'aux requètes demandant de l'HTML :
 
 <ruby>
 class CommentsController < ApplicationController
@@ -1040,21 +1040,21 @@ class CommentsController < ApplicationController
 end
 </ruby>
 
-You'll see a bit more complexity here than you did in the controller for posts. That's a side-effect of the nesting that you've set up; each request for a comment has to keep track of the post to which the comment is attached.
+C'est un peu plus complexe que dans le contrôleur des posts. C'est un effet de bord de l'imbrication; chaque requète pour un comment doit garder trace du post auquel il est attaché.
 
-In addition, the code takes advantage of some of the methods available for an association. For example, in the +new+ method, it calls
+De plus, le code tire parti de certaines méthodes disponibles pour une association. Ainsi, dans la méthode +new+, on a :
 
 <ruby>
 @comment = @post.comments.build
 </ruby>
 
-This creates a new +Comment+ object _and_ sets up the +post_id+ field to have the +id+ from the specified +Post+ object in a single operation.
+Cela crée un nouvel objet +Comment+ _et_ initialise le champ +post_id+ à l'+id+ de l'objet +Post+ spécifié en une seule opération.
 
-h4. Building Views
+h4. Construction de vues
 
-Because you skipped scaffolding, you'll need to build views for comments "by hand." Invoking +script/generate controller+ will give you skeleton views, but they'll be devoid of actual content. Here's a first pass at fleshing out the comment views.
+S'être passé du scaffolding implique qu'il faut construire les vues des comments "à la main." L'invocation de +script/generate controller+ donne bien des embryons de vues mais ils sont essentiellement vides. Voici un premier effort pour donner un peu de consistence aux vues des comments.
 
-The +views/comments/index.html.erb+ view:
+La vue +views/comments/index.html.erb+ :
 
 <erb>
 <h1>Comments for <%= @post.title %></h1>
@@ -1087,7 +1087,7 @@ The +views/comments/index.html.erb+ view:
 <%= link_to 'Back to Post', @post %>
 </erb>
 
-The +views/comments/new.html.erb+ view:
+La vue +views/comments/new.html.erb+ :
 
 <erb>
 <h1>New comment</h1>
@@ -1111,7 +1111,7 @@ The +views/comments/new.html.erb+ view:
 <%= link_to 'Back', post_comments_path(@post) %>
 </erb>
 
-The +views/comments/show.html.erb+ view:
+La vue +views/comments/show.html.erb+ :
 
 <erb>
 <h1>Comment on <%= @post.title %></h1>
@@ -1130,7 +1130,7 @@ The +views/comments/show.html.erb+ view:
 <%= link_to 'Back', post_comments_path(@post) %>
 </erb>
 
-The +views/comments/edit.html.erb+ view:
+La vue +views/comments/edit.html.erb+ :
 
 <erb>
 <h1>Editing comment</h1>
@@ -1155,11 +1155,11 @@ The +views/comments/edit.html.erb+ view:
 <%= link_to 'Back', post_comments_path(@post) %>
 </erb>
 
-Again, the added complexity here (compared to the views you saw for managing posts) comes from the necessity of juggling a post and its comments at the same time.
+A nouveau, cette complexité relative (comparé aux vues de gestion des posts) vient de la nécessité de jongler à la fois d'un post à ces comments.
 
-h4. Hooking Comments to Posts
+h4. Branchement des Comments sur les Posts
 
-As a next step, I'll modify the +views/posts/show.html.erb+ view to show the comments on that post, and to allow managing those comments:
+La prochaine étape consiste en la modification de la vue +views/posts/show.html.erb+ pour montrer les comments de ce post, et pour permettre la gestion de ces comments:
 
 <erb>
 <p>
@@ -1195,23 +1195,23 @@ As a next step, I'll modify the +views/posts/show.html.erb+ view to show the com
 <%= link_to 'Manage Comments', post_comments_path(@post) %>
 </erb>
 
-Note that each post has its own individual comments collection, accessible as +@post.comments+. That's a consequence of the declarative associations in the models. Path helpers such as +post_comments_path+ come from the nested route declaration in +config/routes.rb+.
+Chaque post a sa collection individuelle de comments, disponible dans +@post.comments+. C'est une conséquence des déclarations d'associations dans les modèles. Les chemins tels que +post_comments_path+ proviennent de la déclaration de route imbriquée dans +config/routes.rb+.
 
-h3. Building a Multi-Model Form
+h3. Construction d'un formulaire multi-modèle
 
-Comments and posts are edited on two separate forms - which makes sense, given the flow of this mini-application. But what if you want to edit more than one thing on a single form? Rails 2.3 offers new support for nested forms. Let's add support for giving each post multiple tags, right in the form where you create the post. First, create a new model to hold the tags:
+Les comments et les posts sont édités dans deux formulaires différents, ce qui est cohérent avec le flux de cette mini application. Mais que faire pour modifier plus d'une chose sur un seul formulaire ? Rails 2.3 apporte un nouveau support pour les formulaires imbriqués. Il est possible de supporter le marquage de chaque post par des tags multiples, directement dans le formulaire de création d'un post. D'abord, créez un nouveau modèle pour contenir les tags:
 
 <shell>
 $ script/generate model tag name:string post:references
 </shell>
 
-Run the migration to create the database table:
+Executez la migration pour créer la table :
 
 <shell>
 $ rake db:migrate
 </shell>
 
-Next, edit the +post.rb+ file to create the other side of the association, and to tell Rails that you intend to edit tags via posts:
+Ensuite, editez the +post.rb+ file pour indiquer l'autre aspect de l'association, et pour dire à Rails que vous souhaitez éditer les tags via posts:
 
 <ruby>
 class Post < ActiveRecord::Base
@@ -1225,9 +1225,9 @@ class Post < ActiveRecord::Base
 end
 </ruby>
 
-The +:allow_destroy+ option on the nested attribute declaration tells Rails to display a "remove" checkbox on the view that you'll build shortly. The +:reject_if+ option prevents saving new tags that do not have any attributes filled in.
+L'option +:allow_destroy+ sur la déclaration de d'attribut imbriqué dit à Rails d'afficher un checkbox "remove" sur la vue à venir. L'option +:reject_if+ empèche la sauvegarde de tags sans attribut.
 
-You'll also need to modify +views/posts/_form.html.erb+ to include the tags:
+Vous devez aussi modifier la vue +views/posts/_form.html.erb+ pour ajouter les tags:
 
 <erb>
 <% @post.tags.build if @post.tags.empty? %>
@@ -1266,31 +1266,33 @@ You'll also need to modify +views/posts/_form.html.erb+ to include the tags:
 <% end %>
 </erb>
 
-With these changes in place, you'll find that you can edit a post and its tags directly on the same view.
+Avec ces changements en place, vous pouvez éditer un post et ses tags directement sur la même vue.
 
-NOTE. You may want to use javascript to dynamically add additional tags on a single form. For an example of this and other advanced techniques, see the "nested model sample application":http://github.com/alloy/complex-form-examples/tree/nested_attributes.
+NOTE. Vous aimeriez peut-être utiliser javascript pour ajouter dynamiquement des tags sur un seul formulaire. Pour un tel exemple et d'autres techniques avancées consultez "nested model sample application":http://github.com/alloy/complex-form-examples/tree/nested_attributes.
 
-h3. What's Next?
+h3. Et maintenant ?
 
-Now that you've seen your first Rails application, you should feel free to update it and experiment on your own. But you don't have to do everything without help. As you need assistance getting up and running with Rails, feel free to consult these support resources:
+Maintenant que vous avez découvert votre première application Rails, vous devriez la modifier et expérimenter par vous-même. Mais ce n'est pas la peine de tout faire sans aide. Lorsque le besoin s'en fait sentir dans votre apprentissage de Rails, n'hésitez pas à consulter ces ressources :
 
-* The "Ruby On Rails guides":http://guides.rubyonrails.org
-* The "Ruby on Rails mailing list":http://groups.google.com/group/rubyonrails-talk
-* The #rubyonrails channel on irc.freenode.net
+* les "guides Ruby On Rails":http://guides.rubyonrails.org
+* la "mailing list Ruby on Rails":http://groups.google.com/group/rubyonrails-talk
+* le canal #rubyonrails sur irc.freenode.net
 
-Rails also comes with built-in help that you can generate using the rake command-line utility:
+Rails contient également une aide intégrée que vous pouvez générer en utilisant l'utilitaire rake, en mode ligne de commande :
 
-* Running +rake doc:guides+ will put a full copy of the Rails Guides in the +/doc/guides+ folder of your application. Open +/doc/guides/index.html+ in your web browser to explore the Guides.
-* Running +rake doc:rails+ will put a full copy of the API documentation for Rails in the +/doc/api+ folder of your application. Open +/doc/api/index.html+ in your web browser to explore the API documentation.
+* Executer +rake doc:guides+ met une version complète des Guides Rails Guides dans le répertoire +/doc/guides+ de votre application. Ouvrez +/doc/guides/index.html+ avec un navigateur pour les explorer.
+* Executer +rake doc:rails+ met une version complète de la documentation des API de Rails dans le répertoire +/doc/api+ de votre application. Ouvrez +/doc/api/index.html+ avec un navigateur pour les consulter.
 
-h3. Changelog
+h3. historique des changements
 
 "Lighthouse ticket":http://rails.lighthouseapp.com/projects/16213-rails-guides/tickets/2
 
-* February 1, 2009: Updated for Rails 2.3 by "Mike Gunderloy":credits.html#mgunderloy
-* November 3, 2008: Formatting patch from Dave Rothlisberger
-* November 1, 2008: First approved version by "Mike Gunderloy":credits.html#mgunderloy
-* October 16, 2008: Revised based on feedback from Pratik Naik by "Mike Gunderloy":credits.html#mgunderloy (not yet approved for publication)
-* October 13, 2008: First complete draft by "Mike Gunderloy":credits.html#mgunderloy (not yet approved for publication)
-* October 12, 2008: More detail, rearrangement, editing by "Mike Gunderloy":credits.html#mgunderloy (not yet approved for publication)
-* September 8, 2008: initial version by James Miller (not yet approved for publication)
+* February 15, 2009: Traduction française par Jos Rozen
+
+* February 1, 2009: Mis à jour pour Rails 2.3 par "Mike Gunderloy":credits.html#mgunderloy
+* November 3, 2008: patch de formatage de Dave Rothlisberger
+* November 1, 2008: première version approuvée par "Mike Gunderloy":credits.html#mgunderloy
+* October 16, 2008: révision sur la base des remarques de Pratik Naik par "Mike Gunderloy":credits.html#mgunderloy (pas encore approuvé pour publication)
+* October 13, 2008: premier brouillon complet par "Mike Gunderloy":credits.html#mgunderloy (pas encore approuvé pour publication)
+* October 12, 2008: version plus détaillée, réorganisation, édition par "Mike Gunderloy":credits.html#mgunderloy (pas encore approuvé pour publication)
+* September 8, 2008: version initiale de James Miller (pas encore approuvé pour publication)
