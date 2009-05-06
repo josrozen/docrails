@@ -120,7 +120,7 @@ class TestPluginLoader < Test::Unit::TestCase
 
     @loader.add_plugin_load_paths
 
-    %w( models controllers helpers ).each do |app_part|
+    %w( models controllers metal helpers ).each do |app_part|
       assert ActiveSupport::Dependencies.load_paths.include?(
         File.join(plugin_fixture_path('engines/engine'), 'app', app_part)
       ), "Couldn't find #{app_part} in load path"
@@ -132,8 +132,8 @@ class TestPluginLoader < Test::Unit::TestCase
 
     @loader.send :add_engine_view_paths
     
-    assert_equal [ File.join(plugin_fixture_path('engines/engine'), 'app', 'views') ], ActionController::Base.view_paths
-    assert_equal [ File.join(plugin_fixture_path('engines/engine'), 'app', 'views') ], ActionMailer::Base.view_paths
+    assert_equal [ File.join(plugin_fixture_path('engines/engine'), 'app', 'views') ], ActionController::Base.view_paths.map { |p| p.to_s }
+    assert_equal [ File.join(plugin_fixture_path('engines/engine'), 'app', 'views') ], ActionMailer::Base.view_paths.map { |p| p.to_s }
   end
   
   def test_should_add_plugin_load_paths_to_Dependencies_load_once_paths

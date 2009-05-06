@@ -1,5 +1,7 @@
 $:.unshift File.dirname(__FILE__) + "/../../activesupport/lib"
+$:.unshift File.dirname(__FILE__) + "/../../activerecord/lib"
 $:.unshift File.dirname(__FILE__) + "/../../actionpack/lib"
+$:.unshift File.dirname(__FILE__) + "/../../actionmailer/lib"
 $:.unshift File.dirname(__FILE__) + "/../lib"
 $:.unshift File.dirname(__FILE__) + "/../builtin/rails_info"
 
@@ -11,6 +13,7 @@ gem 'mocha', '>= 0.9.5'
 require 'mocha'
 
 require 'active_support'
+require 'active_support/core/all'
 require 'active_support/test_case'
 
 if defined?(RAILS_ROOT)

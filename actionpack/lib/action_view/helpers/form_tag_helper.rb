@@ -360,8 +360,8 @@ module ActionView
         end
 
         if confirm = options.delete("confirm")
-          options["onclick"] ||= ''
-          options["onclick"] << "return #{confirm_javascript_function(confirm)};"
+          options["onclick"] ||= 'return true;'
+          options["onclick"] = "if (!#{confirm_javascript_function(confirm)}) return false; #{options['onclick']}"
         end
 
         tag :input, { "type" => "submit", "name" => "commit", "value" => value }.update(options.stringify_keys)
@@ -406,7 +406,7 @@ module ActionView
       # <tt>legend</tt> will become the fieldset's title (optional as per W3C).
       # <tt>options</tt> accept the same values as tag.
       #
-      # === Examples
+      # ==== Examples
       #   <% field_set_tag do %>
       #     <p><%= text_field_tag 'name' %></p>
       #   <% end %>

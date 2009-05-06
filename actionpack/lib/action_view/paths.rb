@@ -2,16 +2,13 @@ module ActionView #:nodoc:
   class PathSet < Array #:nodoc:
     def self.type_cast(obj)
       if obj.is_a?(String)
-        if Base.cache_template_loading?
-          Template::EagerPath.new(obj.to_s)
-        else
-          ReloadableTemplate::ReloadablePath.new(obj.to_s)
-        end
+        cache = !Object.const_defined?(:Rails) || Rails.configuration.cache_classes
+        Template::FileSystemPathWithFallback.new(obj, :cache => cache)
       else
         obj
       end
     end
-    
+
     def initialize(*args)
       super(*args).map! { |obj| self.class.type_cast(obj) }
     end
@@ -35,33 +32,47 @@ module ActionView #:nodoc:
     def unshift(*objs)
       super(*objs.map { |obj| self.class.type_cast(obj) })
     end
+
+    def find_by_parts(path, details = {}, prefix = nil, partial = false)
+      # template_path = path.sub(/^\//, '')
+      template_path = path
+
+      each do |load_path|
+        if template = load_path.find_by_parts(template_path, details, prefix, partial)
+          return template
+        end
+      end
+      
+      # TODO: Have a fallback absolute path?
+      extension = details[:formats] || []
+      raise ActionView::MissingTemplate.new(self, "#{prefix}/#{path} - #{details.inspect} - partial: #{!!partial}")
+    end
     
-    def load!
-      each(&:load!)
+    def find_by_parts?(path, extension = nil, prefix = nil, partial = false)
+      template_path = path.sub(/^\//, '')
+
+      each do |load_path|
+        return true if template = load_path.find_by_parts(template_path, extension, prefix, partial)
+      end      
+      false
     end
 
-    def find_template(original_template_path, format = nil)
+    def find_template(original_template_path, format = nil, html_fallback = true)
       return original_template_path if original_template_path.respond_to?(:render)
       template_path = original_template_path.sub(/^\//, '')
 
       each do |load_path|
-        if format && (template = load_path["#{template_path}.#{I18n.locale}.#{format}"])
-          return template
-        elsif format && (template = load_path["#{template_path}.#{format}"])
-          return template
-        elsif template = load_path["#{template_path}.#{I18n.locale}"]
-          return template
-        elsif template = load_path[template_path]
+        if template = load_path.find_by_parts(template_path, format)
           return template
         # Try to find html version if the format is javascript
-        elsif format == :js && template = load_path["#{template_path}.#{I18n.locale}.html"]
+        elsif format == :js && html_fallback && template = load_path["#{template_path}.#{I18n.locale}.html"]
           return template
-        elsif format == :js && template = load_path["#{template_path}.html"]
+        elsif format == :js && html_fallback && template = load_path["#{template_path}.html"]
           return template
         end
       end
 
-      return Template.new(original_template_path, original_template_path =~ /\A\// ? "" : ".") if File.file?(original_template_path)
+      return Template.new(original_template_path, original_template_path.to_s =~ /\A\// ? "" : ".") if File.file?(original_template_path)
 
       raise MissingTemplate.new(self, original_template_path, format)
     end

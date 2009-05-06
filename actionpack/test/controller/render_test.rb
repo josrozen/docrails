@@ -1,5 +1,6 @@
 require 'abstract_unit'
 require 'controller/fake_models'
+require 'pathname'
 
 module Fun
   class GamesController < ActionController::Base
@@ -35,6 +36,39 @@ class TestController < ActionController::Base
     if stale?(:last_modified => Time.now.utc.beginning_of_day, :etag => [:foo, 123])
       render :action => 'hello_world'
     end
+  end
+  
+  def conditional_hello_with_public_header
+    if stale?(:last_modified => Time.now.utc.beginning_of_day, :etag => [:foo, 123], :public => true)
+      render :action => 'hello_world'
+    end
+  end
+  
+  def conditional_hello_with_public_header_and_expires_at
+    expires_in 1.minute
+    if stale?(:last_modified => Time.now.utc.beginning_of_day, :etag => [:foo, 123], :public => true)
+      render :action => 'hello_world'
+    end
+  end
+  
+  def conditional_hello_with_expires_in
+    expires_in 1.minute
+    render :action => 'hello_world'
+  end
+  
+  def conditional_hello_with_expires_in_with_public
+    expires_in 1.minute, :public => true
+    render :action => 'hello_world'
+  end
+  
+  def conditional_hello_with_expires_in_with_public_with_more_keys
+    expires_in 1.minute, :public => true, 'max-stale' => 5.hours
+    render :action => 'hello_world'
+  end
+  
+  def conditional_hello_with_expires_in_with_public_with_more_keys_old_syntax
+    expires_in 1.minute, :public => true, :private => nil, 'max-stale' => 5.hours
+    render :action => 'hello_world'
   end
 
   def conditional_hello_with_bangs
@@ -124,6 +158,11 @@ class TestController < ActionController::Base
     render :file => 'test/dot.directory/render_file_with_ivar'
   end
 
+  def render_file_using_pathname
+    @secret = 'in the sauce'
+    render :file => Pathname.new(File.dirname(__FILE__)).join('..', 'fixtures', 'test', 'dot.directory', 'render_file_with_ivar.erb')
+  end
+
   def render_file_from_template
     @secret = 'in the sauce'
     @path = File.expand_path(File.join(File.dirname(__FILE__), '../fixtures/test/render_file_with_ivar.erb'))
@@ -156,19 +195,19 @@ class TestController < ActionController::Base
   end
 
   def render_json_hello_world
-    render :json => {:hello => 'world'}.to_json
+    render :json => ActiveSupport::JSON.encode(:hello => 'world')
   end
 
   def render_json_hello_world_with_callback
-    render :json => {:hello => 'world'}.to_json, :callback => 'alert'
+    render :json => ActiveSupport::JSON.encode(:hello => 'world'), :callback => 'alert'
   end
 
   def render_json_with_custom_content_type
-    render :json => {:hello => 'world'}.to_json, :content_type => 'text/javascript'
+    render :json => ActiveSupport::JSON.encode(:hello => 'world'), :content_type => 'text/javascript'
   end
 
   def render_symbol_json
-    render :json => {:hello => 'world'}.to_json
+    render :json => ActiveSupport::JSON.encode(:hello => 'world')
   end
 
   def render_json_with_render_to_string
@@ -277,9 +316,6 @@ class TestController < ActionController::Base
   def render_implicit_html_template_from_xhr_request
   end
 
-  def render_implicit_js_template_without_layout
-  end
-
   def formatted_html_erb
   end
 
@@ -348,7 +384,7 @@ class TestController < ActionController::Base
   end
 
   def accessing_params_in_template_with_layout
-    render :layout => nil, :inline =>  "Hello: <%= params[:name] %>"
+    render :layout => true, :inline =>  "Hello: <%= params[:name] %>"
   end
 
   def render_with_explicit_template
@@ -645,6 +681,14 @@ class TestController < ActionController::Base
     render :partial => "hash_object", :object => {:first_name => "Sam"}
   end
 
+  def partial_with_nested_object
+    render :partial => "quiz/questions/question", :object => Quiz::Question.new("first")
+  end
+
+  def partial_with_nested_object_shorthand
+    render Quiz::Question.new("first")
+  end
+
   def partial_hash_collection
     render :partial => "hash_object", :collection => [ {:first_name => "Pratik"}, {:first_name => "Amy"} ]
   end
@@ -684,12 +728,13 @@ class TestController < ActionController::Base
              "render_with_explicit_string_template",
              "render_js_with_explicit_template",
              "render_js_with_explicit_action_template",
-             "delete_with_js", "update_page", "update_page_with_instance_variables",
-             "render_implicit_js_template_without_layout"
+             "delete_with_js", "update_page", "update_page_with_instance_variables"
 
           "layouts/standard"
         when "action_talk_to_layout", "layout_overriding_layout"
           "layouts/talk_from_action"
+        when "render_implicit_html_template_from_xhr_request"
+          (request.xhr? ? 'layouts/xhr' : 'layouts/standard')
       end
     end
 end
@@ -700,6 +745,7 @@ class RenderTest < ActionController::TestCase
   def setup
     # enable a logger so that (e.g.) the benchmarking stuff runs, so we can get
     # a more accurate simulation of what happens in "real life".
+    super
     @controller.logger = Logger.new(nil)
 
     @request.host = "www.nextangle.com"
@@ -727,7 +773,7 @@ class RenderTest < ActionController::TestCase
     begin
       get :render_line_offset
       flunk "the action should have raised an exception"
-    rescue RuntimeError => exc
+    rescue StandardError => exc
       line = exc.backtrace.first
       assert(line =~ %r{:(\d+):})
       assert_equal "1", $1,
@@ -808,6 +854,11 @@ class RenderTest < ActionController::TestCase
     assert_equal "The secret is in the sauce\n", @response.body
   end
 
+  def test_render_file_using_pathname
+    get :render_file_using_pathname
+    assert_equal "The secret is in the sauce\n", @response.body
+  end
+
   def test_render_file_with_locals
     get :render_file_with_locals
     assert_equal "The secret is in the sauce\n", @response.body
@@ -825,31 +876,31 @@ class RenderTest < ActionController::TestCase
 
   def test_render_json
     get :render_json_hello_world
-    assert_equal '{"hello": "world"}', @response.body
+    assert_equal '{"hello":"world"}', @response.body
     assert_equal 'application/json', @response.content_type
   end
 
   def test_render_json_with_callback
     get :render_json_hello_world_with_callback
-    assert_equal 'alert({"hello": "world"})', @response.body
+    assert_equal 'alert({"hello":"world"})', @response.body
     assert_equal 'application/json', @response.content_type
   end
 
   def test_render_json_with_custom_content_type
     get :render_json_with_custom_content_type
-    assert_equal '{"hello": "world"}', @response.body
+    assert_equal '{"hello":"world"}', @response.body
     assert_equal 'text/javascript', @response.content_type
   end
 
   def test_render_symbol_json
     get :render_symbol_json
-    assert_equal '{"hello": "world"}', @response.body
+    assert_equal '{"hello":"world"}', @response.body
     assert_equal 'application/json', @response.content_type
   end
 
   def test_render_json_with_render_to_string
     get :render_json_with_render_to_string
-    assert_equal '{"hello": "partial html"}', @response.body
+    assert_equal '{"hello":"partial html"}', @response.body
     assert_equal 'application/json', @response.content_type
   end
 
@@ -884,11 +935,11 @@ class RenderTest < ActionController::TestCase
   end
 
   def test_attempt_to_access_object_method
-    assert_raises(ActionController::UnknownAction, "No action responded to [clone]") { get :clone }
+    assert_raise(ActionController::UnknownAction, "No action responded to [clone]") { get :clone }
   end
 
   def test_private_methods
-    assert_raises(ActionController::UnknownAction, "No action responded to [determine_layout]") { get :determine_layout }
+    assert_raise(ActionController::UnknownAction, "No action responded to [determine_layout]") { get :determine_layout }
   end
 
   def test_access_to_request_in_view
@@ -1018,13 +1069,17 @@ class RenderTest < ActionController::TestCase
   end
 
   def test_should_implicitly_render_html_template_from_xhr_request
-    get :render_implicit_html_template_from_xhr_request, :format => :js
-    assert_equal "Hello HTML!", @response.body
+    pending do
+      xhr :get, :render_implicit_html_template_from_xhr_request
+      assert_equal "XHR!\nHello HTML!", @response.body
+    end
   end
 
   def test_should_implicitly_render_js_template_without_layout
-    get :render_implicit_js_template_without_layout, :format => :js
-    assert_no_match /<html>/, @response.body
+    pending do
+      get :render_implicit_js_template_without_layout, :format => :js
+      assert_no_match %r{<html>}, @response.body
+    end
   end
 
   def test_should_render_formatted_template
@@ -1115,7 +1170,7 @@ class RenderTest < ActionController::TestCase
   end
 
   def test_bad_render_to_string_still_throws_exception
-    assert_raises(ActionView::MissingTemplate) { get :render_to_string_with_exception }
+    assert_raise(ActionView::MissingTemplate) { get :render_to_string_with_exception }
   end
 
   def test_render_to_string_that_throws_caught_exception_doesnt_break_assigns
@@ -1140,15 +1195,15 @@ class RenderTest < ActionController::TestCase
   end
 
   def test_double_render
-    assert_raises(ActionController::DoubleRenderError) { get :double_render }
+    assert_raise(ActionController::DoubleRenderError) { get :double_render }
   end
 
   def test_double_redirect
-    assert_raises(ActionController::DoubleRenderError) { get :double_redirect }
+    assert_raise(ActionController::DoubleRenderError) { get :double_redirect }
   end
 
   def test_render_and_redirect
-    assert_raises(ActionController::DoubleRenderError) { get :render_and_redirect }
+    assert_raise(ActionController::DoubleRenderError) { get :render_and_redirect }
   end
 
   # specify the one exception to double render rule - render_to_string followed by render
@@ -1240,7 +1295,7 @@ class RenderTest < ActionController::TestCase
     assert !@response.headers.include?('Content-Length')
     assert_response :no_content
 
-    ActionController::StatusCodes::SYMBOL_TO_STATUS_CODE.each do |status, code|
+    ActionDispatch::StatusCodes::SYMBOL_TO_STATUS_CODE.each do |status, code|
       get :head_with_symbolic_status, :status => status.to_s
       assert_equal code, @response.response_code
       assert_response status
@@ -1248,7 +1303,7 @@ class RenderTest < ActionController::TestCase
   end
 
   def test_head_with_integer_status
-    ActionController::StatusCodes::STATUS_CODES.each do |code, message|
+    ActionDispatch::StatusCodes::STATUS_CODES.each do |code, message|
       get :head_with_integer_status, :status => code.to_s
       assert_equal message, @response.message
     end
@@ -1429,6 +1484,16 @@ class RenderTest < ActionController::TestCase
     assert_equal "Sam\nmaS\n", @response.body
   end
 
+  def test_partial_with_nested_object
+    get :partial_with_nested_object
+    assert_equal "first", @response.body
+  end
+
+  def test_partial_with_nested_object_shorthand
+    get :partial_with_nested_object_shorthand
+    assert_equal "first", @response.body
+  end
+
   def test_hash_partial_collection
     get :partial_hash_collection
     assert_equal "Pratik\nkitarP\nAmy\nymA\n", @response.body
@@ -1447,7 +1512,7 @@ class RenderTest < ActionController::TestCase
   end
 
   def test_render_missing_partial_template
-    assert_raises(ActionView::MissingTemplate) do
+    assert_raise(ActionView::MissingTemplate) do
       get :missing_partial
     end
   end
@@ -1463,10 +1528,40 @@ class RenderTest < ActionController::TestCase
   end
 end
 
+class ExpiresInRenderTest < ActionController::TestCase
+  tests TestController
+
+  def setup
+    @request.host = "www.nextangle.com"
+  end
+  
+  def test_expires_in_header
+    get :conditional_hello_with_expires_in
+    assert_equal "max-age=60, private", @response.headers["Cache-Control"]
+  end
+  
+  def test_expires_in_header_with_public
+    get :conditional_hello_with_expires_in_with_public
+    assert_equal "max-age=60, public", @response.headers["Cache-Control"]
+  end
+  
+  def test_expires_in_header_with_additional_headers
+    get :conditional_hello_with_expires_in_with_public_with_more_keys
+    assert_equal "max-age=60, public, max-stale=18000", @response.headers["Cache-Control"]
+  end
+  
+  def test_expires_in_old_syntax
+    get :conditional_hello_with_expires_in_with_public_with_more_keys_old_syntax
+    assert_equal "max-age=60, public, max-stale=18000", @response.headers["Cache-Control"]
+  end
+end
+
+
 class EtagRenderTest < ActionController::TestCase
   tests TestController
 
   def setup
+    super
     @request.host = "www.nextangle.com"
     @expected_bang_etag = etag_for(expand_key([:foo, 123]))
   end
@@ -1552,6 +1647,16 @@ class EtagRenderTest < ActionController::TestCase
     get :conditional_hello_with_bangs
     assert_response :not_modified
   end
+  
+  def test_etag_with_public_true_should_set_header
+    get :conditional_hello_with_public_header
+    assert_equal "public", @response.headers['Cache-Control']
+  end
+  
+  def test_etag_with_public_true_should_set_header_and_retain_other_headers
+    get :conditional_hello_with_public_header_and_expires_at
+    assert_equal "max-age=60, public", @response.headers['Cache-Control']
+  end
 
   protected
     def etag_for(text)
@@ -1567,6 +1672,7 @@ class LastModifiedRenderTest < ActionController::TestCase
   tests TestController
 
   def setup
+    super
     @request.host = "www.nextangle.com"
     @last_modified = Time.now.utc.beginning_of_day.httpdate
   end
@@ -1622,6 +1728,7 @@ class RenderingLoggingTest < ActionController::TestCase
   tests TestController
 
   def setup
+    super
     @request.host = "www.nextangle.com"
   end
 
@@ -1629,7 +1736,7 @@ class RenderingLoggingTest < ActionController::TestCase
     @controller.logger = MockLogger.new
     get :layout_test
     logged = @controller.logger.logged.find_all {|l| l =~ /render/i }
-    assert_equal "Rendering template within layouts/standard", logged[0]
-    assert_equal "Rendering test/hello_world", logged[1]
+    assert logged[0] =~ %r{Rendering.*test/hello_world}
+    assert logged[1] =~ %r{Rendering template within.*layouts/standard}
   end
 end

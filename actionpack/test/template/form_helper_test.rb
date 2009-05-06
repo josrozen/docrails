@@ -45,6 +45,7 @@ class FormHelperTest < ActionView::TestCase
   tests ActionView::Helpers::FormHelper
 
   def setup
+    super
     @post = Post.new
     @comment = Comment.new
     def @post.errors()
@@ -999,6 +1000,47 @@ class FormHelperTest < ActionView::TestCase
       "<label for='secret'>Secret:</label> <input name='post[secret]' type='hidden' value='0' /><input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' /><br/>"
 
     assert_dom_equal expected, output_buffer
+  end
+
+  def test_form_for_with_labelled_builder_with_nested_fields_for_without_options_hash
+    klass = nil
+
+    form_for(:post, @post, :builder => LabelledFormBuilder) do |f|
+      f.fields_for(:comments, Comment.new) do |nested_fields|
+        klass = nested_fields.class
+        ''
+      end
+    end
+
+    assert_equal LabelledFormBuilder, klass
+  end
+
+  def test_form_for_with_labelled_builder_with_nested_fields_for_with_options_hash
+    klass = nil
+
+    form_for(:post, @post, :builder => LabelledFormBuilder) do |f|
+      f.fields_for(:comments, Comment.new, :index => 'foo') do |nested_fields|
+        klass = nested_fields.class
+        ''
+      end
+    end
+
+    assert_equal LabelledFormBuilder, klass
+  end
+
+  class LabelledFormBuilderSubclass < LabelledFormBuilder; end
+
+  def test_form_for_with_labelled_builder_with_nested_fields_for_with_custom_builder
+    klass = nil
+
+    form_for(:post, @post, :builder => LabelledFormBuilder) do |f|
+      f.fields_for(:comments, Comment.new, :builder => LabelledFormBuilderSubclass) do |nested_fields|
+        klass = nested_fields.class
+        ''
+      end
+    end
+
+    assert_equal LabelledFormBuilderSubclass, klass
   end
 
   def test_form_for_with_html_options_adds_options_to_form_tag

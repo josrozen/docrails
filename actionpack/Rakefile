@@ -30,7 +30,7 @@ Rake::TestTask.new(:test_action_pack) do |t|
 
   # make sure we include the tests in alphabetical order as on some systems
   # this will not happen automatically and the tests (as a whole) will error
-  t.test_files = Dir.glob( "test/[cft]*/**/*_test.rb" ).sort
+  t.test_files = Dir.glob( "test/[cdft]*/**/*_test.rb" ).sort
 
   t.verbose = true
   #t.warning = true
@@ -80,8 +80,7 @@ spec = Gem::Specification.new do |s|
   s.has_rdoc = true
   s.requirements << 'none'
 
-  s.add_dependency('activesupport', '= 2.3.0' + PKG_BUILD)
-  s.add_dependency('rack', '>= 0.9.0')
+  s.add_dependency('activesupport', '= 2.3.2' + PKG_BUILD)
 
   s.require_path = 'lib'
   s.autorequire = 'action_controller'

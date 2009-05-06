@@ -1,4 +1,5 @@
 require "cases/helper"
+require 'models/post'
 require 'models/author'
 require 'models/topic'
 require 'models/reply'
@@ -12,7 +13,6 @@ require 'models/auto_id'
 require 'models/column_name'
 require 'models/subscriber'
 require 'models/keyboard'
-require 'models/post'
 require 'models/comment'
 require 'models/minimalistic'
 require 'models/warehouse_thing'
@@ -424,8 +424,8 @@ class BasicsTest < ActiveRecord::TestCase
   def test_non_attribute_access_and_assignment
     topic = Topic.new
     assert !topic.respond_to?("mumbo")
-    assert_raises(NoMethodError) { topic.mumbo }
-    assert_raises(NoMethodError) { topic.mumbo = 5 }
+    assert_raise(NoMethodError) { topic.mumbo }
+    assert_raise(NoMethodError) { topic.mumbo = 5 }
   end
 
   def test_preserving_date_objects
@@ -456,7 +456,7 @@ class BasicsTest < ActiveRecord::TestCase
     )
 
     # For adapters which support microsecond resolution.
-    if current_adapter?(:PostgreSQLAdapter)
+    if current_adapter?(:PostgreSQLAdapter) || current_adapter?(:SQLiteAdapter)
       assert_equal 11, Topic.find(1).written_on.sec
       assert_equal 223300, Topic.find(1).written_on.usec
       assert_equal 9900, Topic.find(2).written_on.usec
@@ -490,7 +490,7 @@ class BasicsTest < ActiveRecord::TestCase
   end
 
   def test_record_not_found_exception
-    assert_raises(ActiveRecord::RecordNotFound) { topicReloaded = Topic.find(99999) }
+    assert_raise(ActiveRecord::RecordNotFound) { topicReloaded = Topic.find(99999) }
   end
 
   def test_initialize_with_attributes
@@ -848,7 +848,7 @@ class BasicsTest < ActiveRecord::TestCase
     client.delete
     assert client.frozen?
     assert_kind_of Firm, client.firm
-    assert_raises(ActiveSupport::FrozenObjectError) { client.name = "something else" }
+    assert_raise(ActiveSupport::FrozenObjectError) { client.name = "something else" }
   end
 
   def test_destroy_new_record
@@ -862,7 +862,7 @@ class BasicsTest < ActiveRecord::TestCase
     client.destroy
     assert client.frozen?
     assert_kind_of Firm, client.firm
-    assert_raises(ActiveSupport::FrozenObjectError) { client.name = "something else" }
+    assert_raise(ActiveSupport::FrozenObjectError) { client.name = "something else" }
   end
 
   def test_update_attribute
@@ -910,8 +910,8 @@ class BasicsTest < ActiveRecord::TestCase
 
   def test_mass_assignment_should_raise_exception_if_accessible_and_protected_attribute_writers_are_both_used
     topic = TopicWithProtectedContentAndAccessibleAuthorName.new
-    assert_raises(RuntimeError) { topic.attributes = { "author_name" => "me" } }
-    assert_raises(RuntimeError) { topic.attributes = { "content" => "stuff" } }
+    assert_raise(RuntimeError) { topic.attributes = { "author_name" => "me" } }
+    assert_raise(RuntimeError) { topic.attributes = { "content" => "stuff" } }
   end
 
   def test_mass_assignment_protection
@@ -949,7 +949,7 @@ class BasicsTest < ActiveRecord::TestCase
   def test_mass_assigning_invalid_attribute
     firm = Firm.new
 
-    assert_raises(ActiveRecord::UnknownAttributeError) do
+    assert_raise(ActiveRecord::UnknownAttributeError) do
       firm.attributes = { "id" => 5, "type" => "Client", "i_dont_even_exist" => 20 }
     end
   end
@@ -1115,7 +1115,7 @@ class BasicsTest < ActiveRecord::TestCase
     Time.zone = nil
     Topic.skip_time_zone_conversion_for_attributes = []
   end
-  
+
   def test_multiparameter_attributes_on_time_only_column_with_time_zone_aware_attributes_does_not_do_time_zone_conversion
     ActiveRecord::Base.time_zone_aware_attributes = true
     ActiveRecord::Base.default_timezone = :utc
@@ -1402,7 +1402,7 @@ class BasicsTest < ActiveRecord::TestCase
   end
 
   def test_sql_injection_via_find
-    assert_raises(ActiveRecord::RecordNotFound, ActiveRecord::StatementInvalid) do
+    assert_raise(ActiveRecord::RecordNotFound, ActiveRecord::StatementInvalid) do
       Topic.find("123456 OR id > 0")
     end
   end
@@ -1439,7 +1439,7 @@ class BasicsTest < ActiveRecord::TestCase
     topic = Topic.create("content" => myobj).reload
     assert_equal(myobj, topic.content)
   end
-  
+
   def test_serialized_string_attribute
     myobj = "Yes"
     topic = Topic.create("content" => myobj).reload
@@ -1755,6 +1755,13 @@ class BasicsTest < ActiveRecord::TestCase
     end
   end
 
+  def test_scoped_find_with_group_and_having
+    developers = Developer.with_scope(:find => { :group => 'developers.salary', :having => "SUM(salary) > 10000", :select => "SUM(salary) as salary" }) do
+      Developer.find(:all)
+    end
+    assert_equal 3, developers.size
+  end
+
   def test_find_last
     last  = Developer.find :last
     assert_equal last, Developer.find(:first, :order => 'id desc')
@@ -1781,6 +1788,11 @@ class BasicsTest < ActiveRecord::TestCase
   def test_find_multiple_ordered_last
     last  = Developer.find :last, :order => 'developers.name, developers.salary DESC'
     assert_equal last, Developer.find(:all, :order => 'developers.name, developers.salary DESC').last
+  end
+
+  def test_find_symbol_ordered_last
+    last  = Developer.find :last, :order => :salary
+    assert_equal last, Developer.find(:all, :order => :salary).last
   end
 
   def test_find_scoped_ordered_last
@@ -2092,18 +2104,4 @@ class BasicsTest < ActiveRecord::TestCase
       assert_equal custom_datetime, parrot[attribute]
     end
   end
-
-  private
-    def with_kcode(kcode)
-      if RUBY_VERSION < '1.9'
-        orig_kcode, $KCODE = $KCODE, kcode
-        begin
-          yield
-        ensure
-          $KCODE = orig_kcode
-        end
-      else
-        yield
-      end
-    end
 end

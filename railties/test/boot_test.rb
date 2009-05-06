@@ -1,6 +1,7 @@
 require 'abstract_unit'
 require 'initializer'
 require "#{File.dirname(__FILE__)}/../environments/boot"
+require 'rails/gem_dependency'
 
 class BootTest < Test::Unit::TestCase
   def test_boot_returns_if_booted
@@ -62,6 +63,8 @@ class VendorBootTest < Test::Unit::TestCase
   def test_load_initializer_requires_from_vendor_rails
     boot = VendorBoot.new
     boot.expects(:require).with("#{RAILS_ROOT}/vendor/rails/railties/lib/initializer")
+    Rails::Initializer.expects(:run).with(:install_gem_spec_stubs)
+    Rails::GemDependency.expects(:add_frozen_gem_path)
     boot.load_initializer
   end
 end

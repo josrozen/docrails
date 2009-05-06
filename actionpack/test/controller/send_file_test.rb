@@ -44,12 +44,12 @@ class SendFileTest < ActionController::TestCase
     response = nil
     assert_nothing_raised { response = process('file') }
     assert_not_nil response
-    assert_kind_of Proc, response.body
+    assert_kind_of Proc, response.body_parts
 
     require 'stringio'
     output = StringIO.new
     output.binmode
-    assert_nothing_raised { response.body.call(response, output) }
+    assert_nothing_raised { response.body_parts.call(response, output) }
     assert_equal file_data, output.string
   end
 
@@ -142,7 +142,7 @@ class SendFileTest < ActionController::TestCase
     }
 
     @controller.headers = {}
-    assert_raises(ArgumentError){ @controller.send(:send_file_headers!, options) }
+    assert_raise(ArgumentError){ @controller.send(:send_file_headers!, options) }
   end
 
   %w(file data).each do |method|
@@ -155,7 +155,7 @@ class SendFileTest < ActionController::TestCase
     define_method "test_default_send_#{method}_status" do
       @controller.options = { :stream => false }
       assert_nothing_raised { assert_not_nil process(method) }
-      assert_equal ActionController::Base::DEFAULT_RENDER_STATUS_CODE, @response.status
+      assert_equal ActionController::DEFAULT_RENDER_STATUS_CODE, @response.status
     end
   end
 end

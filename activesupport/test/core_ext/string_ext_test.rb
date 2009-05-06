@@ -3,6 +3,9 @@ require 'date'
 require 'abstract_unit'
 require 'inflector_test_cases'
 
+require 'active_support/core_ext/string'
+require 'active_support/core_ext/time'
+
 class StringInflectionsTest < Test::Unit::TestCase
   include InflectorTestCases
 
@@ -77,6 +80,24 @@ class StringInflectionsTest < Test::Unit::TestCase
     end
   end
 
+  def test_string_parameterized_normal
+    StringToParameterized.each do |normal, slugged|
+      assert_equal(normal.parameterize, slugged)
+    end
+  end
+
+  def test_string_parameterized_no_separator
+    StringToParameterizeWithNoSeparator.each do |normal, slugged|
+      assert_equal(normal.parameterize(''), slugged)
+    end
+  end
+
+  def test_string_parameterized_underscore
+    StringToParameterizeWithUnderscore.each do |normal, slugged|
+      assert_equal(normal.parameterize('_'), slugged)
+    end
+  end
+
   def test_humanize
     UnderscoreToHuman.each do |underscore, human|
       assert_equal(human, underscore.humanize)
@@ -114,10 +135,12 @@ class StringInflectionsTest < Test::Unit::TestCase
 
     assert_equal "h", s.first
     assert_equal "he", s.first(2)
+    assert_equal "", s.first(0)
 
     assert_equal "o", s.last
     assert_equal "llo", s.last(3)
     assert_equal "hello", s.last(10)
+    assert_equal "", s.last(0)
 
     assert_equal 'x', 'x'.first
     assert_equal 'x', 'x'.first(4)

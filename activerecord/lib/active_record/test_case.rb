@@ -20,7 +20,7 @@ module ActiveRecord
       patterns_to_match.each do |pattern|
         failed_patterns << pattern unless $queries_executed.any?{ |sql| pattern === sql }
       end
-      assert failed_patterns.empty?, "Query pattern(s) #{failed_patterns.map(&:inspect).join(', ')} not found."
+      assert failed_patterns.empty?, "Query pattern(s) #{failed_patterns.map(&:inspect).join(', ')} not found.#{$queries_executed.size == 0 ? '' : "\nQueries:\n#{$queries_executed.join("\n")}"}"
     end
 
     def assert_queries(num = 1)
@@ -48,6 +48,19 @@ module ActiveRecord
     def connection_allow_concurrency_teardown
       ActiveRecord::Base.clear_all_connections!
       ActiveRecord::Base.establish_connection(@connection)
+    end
+
+    def with_kcode(kcode)
+      if RUBY_VERSION < '1.9'
+        orig_kcode, $KCODE = $KCODE, kcode
+        begin
+          yield
+        ensure
+          $KCODE = orig_kcode
+        end
+      else
+        yield
+      end
     end
   end
 end

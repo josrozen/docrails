@@ -3,9 +3,10 @@ require 'abstract_unit'
 class JavaScriptHelperTest < ActionView::TestCase
   tests ActionView::Helpers::JavaScriptHelper
 
-  attr_accessor :template_format, :output_buffer
+  attr_accessor :formats, :output_buffer
 
   def setup
+    super
     @template = self
   end
 
@@ -38,11 +39,6 @@ class JavaScriptHelperTest < ActionView::TestCase
       page.replace_html 'header', "<h1>Greetings</h1>"
     end
     assert_dom_equal %(<a href="#" class="updater" onclick="Element.update(&quot;header&quot;, &quot;\\u003Ch1\\u003EGreetings\\u003C/h1\\u003E&quot;);; return false;">Greet me!</a>), html
-  end
-
-  def test_link_to_function_with_href
-    assert_dom_equal %(<a href="http://example.com/" onclick="alert('Hello world!'); return false;">Greeting</a>),
-      link_to_function("Greeting", "alert('Hello world!')", :href => 'http://example.com/')
   end
 
   def test_link_to_function_with_href

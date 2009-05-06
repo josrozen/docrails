@@ -7,6 +7,7 @@ class UrlHelperTest < ActionView::TestCase
   tests ActionView::Helpers::UrlHelper
 
   def setup
+    super
     @controller = Class.new do
       attr_accessor :url, :request
       def url_for(options)
@@ -220,7 +221,7 @@ class UrlHelperTest < ActionView::TestCase
   end
 
   def test_link_tag_using_post_javascript_and_popup
-    assert_raises(ActionView::ActionViewError) { link_to("Hello", "http://www.example.com", :popup => true, :method => :post, :confirm => "Are you serious?") }
+    assert_raise(ActionView::ActionViewError) { link_to("Hello", "http://www.example.com", :popup => true, :method => :post, :confirm => "Are you serious?") }
   end
 
   def test_link_tag_using_block_in_erb
@@ -380,6 +381,7 @@ class UrlHelperWithControllerTest < ActionView::TestCase
   tests ActionView::Helpers::UrlHelper
 
   def setup
+    super
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
     @controller = UrlHelperController.new
@@ -458,6 +460,7 @@ class LinkToUnlessCurrentWithControllerTest < ActionView::TestCase
   tests ActionView::Helpers::UrlHelper
 
   def setup
+    super
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
     @controller = TasksController.new
@@ -560,6 +563,7 @@ class PolymorphicControllerTest < ActionView::TestCase
   tests ActionView::Helpers::UrlHelper
 
   def setup
+    super
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
   end

@@ -119,6 +119,7 @@ XML
   end
 
   def setup
+    super
     @controller = TestController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
@@ -127,6 +128,7 @@ XML
   end
 
   def teardown
+    super
     ActionController::Routing::Routes.reload
   end
 
@@ -180,12 +182,6 @@ XML
     process :set_session
     process :reset_the_session
     assert_equal Hash.new, @controller.session.to_hash
-  end
-
-  def test_session_is_cleared_from_response_after_reset_session
-    process :set_session
-    process :reset_the_session
-    assert_equal Hash.new, @response.session.to_hash
   end
 
   def test_session_is_cleared_from_request_after_reset_session
@@ -515,6 +511,14 @@ XML
     assert_nil @request.instance_variable_get("@request_method")
   end
 
+  def test_params_reset_after_post_request
+    post :no_op, :foo => "bar"
+    assert_equal "bar", @request.params[:foo]
+    @request.recycle!
+    post :no_op
+    assert @request.params[:foo].blank?
+  end
+
   %w(controller response request).each do |variable|
     %w(get post put delete head process).each do |method|
       define_method("test_#{variable}_missing_for_#{method}_raises_error") do
@@ -635,7 +639,7 @@ class CleanBacktraceTest < ActionController::TestCase
   end
 
   def test_should_clean_assertion_lines_from_backtrace
-    path = File.expand_path("#{File.dirname(__FILE__)}/../../lib/action_controller")
+    path = File.expand_path("#{File.dirname(__FILE__)}/../../lib/action_controller/testing")
     exception = ActiveSupport::TestCase::Assertion.new('message')
     exception.set_backtrace ["#{path}/abc", "#{path}/assertions/def"]
     clean_backtrace { raise exception }

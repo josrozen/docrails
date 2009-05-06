@@ -6,6 +6,7 @@ class TextHelperTest < ActionView::TestCase
   include TestingSandbox
 
   def setup
+    super
     # This simulates the fact that instance variables are reset every time
     # a view is rendered.  The cycle helper depends on this behavior.
     @_cycles = nil if (defined? @_cycles)
@@ -373,6 +374,12 @@ class TextHelperTest < ActionView::TestCase
     link3_result = generate_result(link3_raw)
     assert_equal link3_result, auto_link(link3_raw)
     assert_equal "{link: #{link3_result}}", auto_link("{link: #{link3_raw}}")
+  end
+
+  def test_auto_link_in_tags
+    link_raw    = 'http://www.rubyonrails.org/images/rails.png'
+    link_result = %Q(<img src="#{link_raw}" />)
+    assert_equal link_result, auto_link(link_result)
   end
 
   def test_auto_link_at_eol

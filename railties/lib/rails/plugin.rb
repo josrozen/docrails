@@ -35,10 +35,10 @@ module Rails
     def load_paths
       report_nonexistant_or_empty_plugin! unless valid?
       
-      returning [] do |load_paths|
-        load_paths << lib_path  if has_lib_directory?
-        load_paths << app_paths if has_app_directory?
-      end.flatten
+      load_paths = []
+      load_paths << lib_path  if has_lib_directory?
+      load_paths << app_paths if has_app_directory?
+      load_paths.flatten
     end
     
     # Evaluates a plugin's init.rb file.
@@ -80,6 +80,10 @@ module Rails
       File.join(directory, 'app', 'controllers')
     end
 
+    def metal_path
+      File.join(directory, 'app', 'metal')
+    end
+
     def routing_file
       File.join(directory, 'config', 'routes.rb')
     end
@@ -100,7 +104,7 @@ module Rails
 
       
       def app_paths
-        [ File.join(directory, 'app', 'models'), File.join(directory, 'app', 'helpers'), controller_path ]
+        [ File.join(directory, 'app', 'models'), File.join(directory, 'app', 'helpers'), controller_path, metal_path ]
       end
       
       def lib_path

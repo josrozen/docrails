@@ -29,11 +29,13 @@ module RenderTestCases
   end
 
   def test_render_file_with_localization
-    old_locale = I18n.locale
-    I18n.locale = :da
-    assert_equal "Hey verden", @view.render(:file => "test/hello_world")
-  ensure
-    I18n.locale = old_locale
+    begin
+      old_locale = I18n.locale
+      I18n.locale = :da
+      assert_equal "Hey verden", @view.render(:file => "test/hello_world")
+    ensure
+      I18n.locale = old_locale
+    end
   end
 
   def test_render_file_with_dashed_locale
@@ -45,22 +47,26 @@ module RenderTestCases
   end
 
   def test_render_implicit_html_template_from_xhr_request
-    old_format = @view.template_format
-    @view.template_format = :js
-    assert_equal "Hello HTML!", @view.render(:file => "test/render_implicit_html_template_from_xhr_request")
+    old_format = @view.formats
+    pending do
+      @view.formats = [:js]
+      assert_equal "Hello HTML!", @view.render(:file => "test/render_implicit_html_template_from_xhr_request")
+    end
   ensure
-    @view.template_format = old_format
+    @view.formats = old_format
   end
 
   def test_render_implicit_html_template_from_xhr_request_with_localization
     old_locale = I18n.locale
-    old_format = @view.template_format
-    I18n.locale = :da
-    @view.template_format = :js
-    assert_equal "Hey HTML!\n", @view.render(:file => "test/render_implicit_html_template_from_xhr_request")
+    old_format = @view.formats
+    pending do
+      I18n.locale = :da
+      @view.formats = [:js]
+      assert_equal "Hey HTML!\n", @view.render(:file => "test/render_implicit_html_template_from_xhr_request")
+    end
   ensure
     I18n.locale = old_locale
-    @view.template_format = old_format
+    @view.formats = old_format
   end
 
   def test_render_file_at_top_level
@@ -83,10 +89,6 @@ module RenderTestCases
 
   def test_render_file_not_using_full_path_with_dot_in_path
     assert_equal "The secret is in the sauce\n", @view.render(:file => "test/dot.directory/render_file_with_ivar")
-  end
-
-  def test_render_has_access_current_template
-    assert_equal "test/template.erb", @view.render(:file => "test/template.erb")
   end
 
   def test_render_update
@@ -145,6 +147,10 @@ module RenderTestCases
     assert_equal File.expand_path("#{FIXTURE_LOAD_PATH}/test/_raise.html.erb"), e.file_name
   end
 
+  def test_render_object
+    assert_equal "Hello: david", @view.render(:partial => "test/customer", :object => Customer.new("david"))
+  end
+
   def test_render_partial_collection
     assert_equal "Hello: davidHello: mary", @view.render(:partial => "test/customer", :collection => [ Customer.new("david"), Customer.new("mary") ])
   end
@@ -182,7 +188,7 @@ module RenderTestCases
 
   # TODO: The reason for this test is unclear, improve documentation
   def test_render_missing_xml_partial_and_raise_missing_template
-    @view.template_format = :xml
+    @view.formats = [:xml]
     assert_raise(ActionView::MissingTemplate) { @view.render(:partial => "test/layout_for_partial") }
   end
 
@@ -224,6 +230,12 @@ module RenderTestCases
     assert_equal 'source: Hello, <%= name %>!; locals: {:name=>"Josh"}', @view.render(:inline => "Hello, <%= name %>!", :locals => { :name => "Josh" }, :type => :foo)
   end
 
+  def test_render_ignores_templates_with_malformed_template_handlers
+    %w(malformed malformed.erb malformed.html.erb malformed.en.html.erb).each do |name|
+      assert_raise(ActionView::MissingTemplate) { @view.render(:file => "test/malformed/#{name}") }
+    end
+  end
+
   def test_render_with_layout
     assert_equal %(<title></title>\nHello world!\n),
       @view.render(:file => "test/hello_world.erb", :layout => "layouts/yield")
@@ -243,34 +255,26 @@ module RenderTestCases
   end
 end
 
-module TemplatesSetupTeardown
-  def setup_view_paths_for(new_cache_template_loading)
-    @previous_cache_template_loading, ActionView::Base.cache_template_loading = ActionView::Base.cache_template_loading, new_cache_template_loading
-    view_paths = new_cache_template_loading ? CACHED_VIEW_PATHS : ActionView::Base.process_view_paths(CACHED_VIEW_PATHS.map(&:to_s))
-    assert_equal(new_cache_template_loading ? ActionView::Template::EagerPath : ActionView::ReloadableTemplate::ReloadablePath, view_paths.first.class)
+class CachedViewRenderTest < ActiveSupport::TestCase
+  include RenderTestCases
+
+  # Ensure view path cache is primed
+  def setup
+    view_paths = ActionController::Base.view_paths
+    assert_equal ActionView::Template::FileSystemPathWithFallback, view_paths.first.class
     setup_view(view_paths)
   end
-  
-  def teardown
-    ActionView::Base.cache_template_loading = @previous_cache_template_loading
-  end
 end
 
-class CachedRenderTest < Test::Unit::TestCase
-  include TemplatesSetupTeardown
+class LazyViewRenderTest < ActiveSupport::TestCase
   include RenderTestCases
 
+  # Test the same thing as above, but make sure the view path
+  # is not eager loaded
   def setup
-    setup_view_paths_for(cache_templates = true)
+    path = ActionView::Template::FileSystemPathWithFallback.new(FIXTURE_LOAD_PATH)
+    view_paths = ActionView::Base.process_view_paths(path)
+    assert_equal ActionView::Template::FileSystemPathWithFallback, view_paths.first.class
+    setup_view(view_paths)
   end
 end
-
-class ReloadableRenderTest < Test::Unit::TestCase
-  include TemplatesSetupTeardown
-  include RenderTestCases
-
-  def setup
-    setup_view_paths_for(cache_templates = false)
-  end
-end
-

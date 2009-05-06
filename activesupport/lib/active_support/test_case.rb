@@ -12,6 +12,7 @@ require 'active_support/testing/setup_and_teardown'
 require 'active_support/testing/assertions'
 require 'active_support/testing/deprecation'
 require 'active_support/testing/declarative'
+require 'active_support/testing/pending'
 
 module ActiveSupport
   class TestCase < ::Test::Unit::TestCase
@@ -20,7 +21,7 @@ module ActiveSupport
       alias_method :method_name, :name
     else
       # TODO: Figure out how to get the Rails::BacktraceFilter into minitest/unit
-      if defined?(Rails)
+      if defined?(Rails) && ENV['BACKTRACE'].nil?
         require 'rails/backtrace_cleaner'
         Test::Unit::Util::BacktraceFilter.module_eval { include Rails::BacktraceFilterForTestUnit }
       end
@@ -34,6 +35,7 @@ module ActiveSupport
     include ActiveSupport::Testing::SetupAndTeardown
     include ActiveSupport::Testing::Assertions
     include ActiveSupport::Testing::Deprecation
+    include ActiveSupport::Testing::Pending
     extend ActiveSupport::Testing::Declarative
   end
 end

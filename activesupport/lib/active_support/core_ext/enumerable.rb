@@ -42,7 +42,7 @@ module Enumerable
   #
   # The latter is a shortcut for:
   #
-  #  payments.inject { |sum, p| sum + p.price }
+  #  payments.inject(0) { |sum, p| sum + p.price }
   #
   # It can also calculate the sum without the use of a block.
   #
@@ -77,11 +77,10 @@ module Enumerable
   #   (1..5).each_with_object(1) { |value, memo| memo *= value } # => 1
   #
   def each_with_object(memo, &block)
-    returning memo do |m|
-      each do |element|
-        block.call(element, m)
-      end
+    each do |element|
+      block.call(element, memo)
     end
+    memo
   end unless [].respond_to?(:each_with_object)
 
   # Convert an enumerable to a hash. Examples:

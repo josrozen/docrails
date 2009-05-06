@@ -1,3 +1,5 @@
+require 'active_support/json'
+
 module ActiveRecord #:nodoc:
   module Serialization
     def self.included(base)
@@ -72,10 +74,11 @@ module ActiveRecord #:nodoc:
     #                   {"comments": [{"body": "Don't think too hard"}],
     #                    "title": "So I was thinking"}]}
     def to_json(options = {})
+      json = JsonSerializer.new(self, options).to_s
       if include_root_in_json
-        "{#{self.class.json_class_name}: #{JsonSerializer.new(self, options).to_s}}"
+        "{#{self.class.json_class_name}:#{json}}"
       else
-        JsonSerializer.new(self, options).to_s
+        json
       end
     end
 
@@ -84,9 +87,15 @@ module ActiveRecord #:nodoc:
       self
     end
 
+    private
+      # For compatibility with ActiveSupport::JSON.encode
+      def rails_to_json(options, *args)
+        to_json(options)
+      end
+
     class JsonSerializer < ActiveRecord::Serialization::Serializer #:nodoc:
       def serialize
-        serializable_record.to_json
+        ActiveSupport::JSON.encode(serializable_record)
       end
     end
 

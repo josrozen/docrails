@@ -44,6 +44,7 @@ end
 
 class PageCachingTest < ActionController::TestCase
   def setup
+    super
     ActionController::Base.perform_caching = true
 
     ActionController::Routing::Routes.draw do |map|
@@ -222,6 +223,7 @@ end
 
 class ActionCacheTest < ActionController::TestCase
   def setup
+    super
     reset!
     FileUtils.mkdir_p(FILE_STORE_PATH)
     @path_class = ActionController::Caching::Actions::ActionCachePath
@@ -428,6 +430,20 @@ class ActionCacheTest < ActionController::TestCase
     assert_equal 'application/xml', @response.content_type
   end
 
+  def test_correct_content_type_is_returned_for_cache_hit_on_action_with_string_key
+    # run it twice to cache it the first time
+    get :show, :format => 'xml'
+    get :show, :format => 'xml'
+    assert_equal 'application/xml', @response.content_type
+  end
+
+  def test_correct_content_type_is_returned_for_cache_hit_on_action_with_string_key_from_proc
+    # run it twice to cache it the first time
+    get :edit, :id => 1, :format => 'xml'
+    get :edit, :id => 1, :format => 'xml'
+    assert_equal 'application/xml', @response.content_type
+  end
+
   def test_empty_path_is_normalized
     @mock_controller.mock_url_for = 'http://example.org/'
     @mock_controller.mock_path    = '/'
@@ -469,6 +485,7 @@ end
 
 class FragmentCachingTest < ActionController::TestCase
   def setup
+    super
     ActionController::Base.perform_caching = true
     @store = ActiveSupport::Cache::MemoryStore.new
     ActionController::Base.cache_store = @store
@@ -601,6 +618,7 @@ end
 
 class FunctionalFragmentCachingTest < ActionController::TestCase
   def setup
+    super
     ActionController::Base.perform_caching = true
     @store = ActiveSupport::Cache::MemoryStore.new
     ActionController::Base.cache_store = @store

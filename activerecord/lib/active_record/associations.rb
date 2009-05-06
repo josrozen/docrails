@@ -22,7 +22,7 @@ module ActiveRecord
       through_reflection      = reflection.through_reflection
       source_reflection_names = reflection.source_reflection_names
       source_associations     = reflection.through_reflection.klass.reflect_on_all_associations.collect { |a| a.name.inspect }
-      super("Could not find the source association(s) #{source_reflection_names.collect(&:inspect).to_sentence :two_words_connector => ' or ', :last_word_connector => ', or '} in model #{through_reflection.klass}.  Try 'has_many #{reflection.name.inspect}, :through => #{through_reflection.name.inspect}, :source => <name>'.  Is it one of #{source_associations.to_sentence :two_words_connector => ' or ', :last_word_connector => ', or '}?")
+      super("Could not find the source association(s) #{source_reflection_names.collect(&:inspect).to_sentence(:two_words_connector => ' or ', :last_word_connector => ', or ', :locale => :en)} in model #{through_reflection.klass}.  Try 'has_many #{reflection.name.inspect}, :through => #{through_reflection.name.inspect}, :source => <name>'.  Is it one of #{source_associations.to_sentence(:two_words_connector => ' or ', :last_word_connector => ', or ', :locale => :en)}?")
     end
   end
 
@@ -51,6 +51,12 @@ module ActiveRecord
     end
   end
 
+  class HasAndBelongsToManyAssociationForeignKeyNeeded < ActiveRecordError #:nodoc:
+    def initialize(reflection)
+      super("Cannot create self referential has_and_belongs_to_many association on '#{reflection.class_name rescue nil}##{reflection.name rescue nil}'. :association_foreign_key cannot be the same as the :foreign_key.")
+    end
+  end
+
   class EagerLoadPolymorphicError < ActiveRecordError #:nodoc:
     def initialize(reflection)
       super("Can not eagerly load the polymorphic association #{reflection.name.inspect}")
@@ -65,7 +71,7 @@ module ActiveRecord
 
   # See ActiveRecord::Associations::ClassMethods for documentation.
   module Associations # :nodoc:
-    # These classes will be loaded when associatoins are created.
+    # These classes will be loaded when associations are created.
     # So there is no need to eager load them.
     autoload :AssociationCollection, 'active_record/associations/association_collection'
     autoload :AssociationProxy, 'active_record/associations/association_proxy'
@@ -786,11 +792,7 @@ module ActiveRecord
       #       'ORDER BY p.first_name'
       def has_many(association_id, options = {}, &extension)
         reflection = create_has_many_reflection(association_id, options, &extension)
-
         configure_dependency_for_has_many(reflection)
-
-        add_multiple_associated_validation_callbacks(reflection.name) unless options[:validate] == false
-        add_multiple_associated_save_callbacks(reflection.name)
         add_association_callbacks(reflection.name, reflection.options)
 
         if options[:through]
@@ -872,10 +874,10 @@ module ActiveRecord
       # [:source]
       #   Specifies the source association name used by <tt>has_one :through</tt> queries.  Only use it if the name cannot be
       #   inferred from the association.  <tt>has_one :favorite, :through => :favorites</tt> will look for a
-      #   <tt>:favorite</tt> on Favorite, unless a <tt>:source</tt> is given.      
+      #   <tt>:favorite</tt> on Favorite, unless a <tt>:source</tt> is given.
       # [:source_type]
       #   Specifies type of the source association used by <tt>has_one :through</tt> queries where the source
-      #   association is a polymorphic +belongs_to+.      
+      #   association is a polymorphic +belongs_to+.
       # [:readonly]
       #   If true, the associated object is readonly through the association.
       # [:validate]
@@ -898,22 +900,9 @@ module ActiveRecord
           association_accessor_methods(reflection, ActiveRecord::Associations::HasOneThroughAssociation)
         else
           reflection = create_has_one_reflection(association_id, options)
-
-          method_name = "has_one_after_save_for_#{reflection.name}".to_sym
-          define_method(method_name) do
-            association = association_instance_get(reflection.name)
-            if association && (new_record? || association.new_record? || association[reflection.primary_key_name] != id)
-              association[reflection.primary_key_name] = id
-              association.save(true)
-            end
-          end
-          after_save method_name
-
-          add_single_associated_validation_callbacks(reflection.name) if options[:validate] == true
           association_accessor_methods(reflection, HasOneAssociation)
           association_constructor_method(:build,  reflection, HasOneAssociation)
           association_constructor_method(:create, reflection, HasOneAssociation)
-
           configure_dependency_for_has_one(reflection)
         end
       end
@@ -992,6 +981,9 @@ module ActiveRecord
       #   If false, don't validate the associated objects when saving the parent object. +false+ by default.
       # [:autosave]
       #   If true, always save the associated object or destroy it if marked for destruction, when saving the parent object. Off by default.
+      # [:touch]
+      #   If true, the associated object will be touched (the updated_at/on attributes set to now) when this record is either saved or
+      #   destroyed. If you specify a symbol, that attribute will be updated with the current time instead of the updated_at/on attribute.
       #
       # Option examples:
       #   belongs_to :firm, :foreign_key => "client_of"
@@ -1001,73 +993,21 @@ module ActiveRecord
       #   belongs_to :attachable, :polymorphic => true
       #   belongs_to :project, :readonly => true
       #   belongs_to :post, :counter_cache => true
+      #   belongs_to :company, :touch => true
+      #   belongs_to :company, :touch => :employees_last_updated_at
       def belongs_to(association_id, options = {})
         reflection = create_belongs_to_reflection(association_id, options)
 
         if reflection.options[:polymorphic]
           association_accessor_methods(reflection, BelongsToPolymorphicAssociation)
-
-          method_name = "polymorphic_belongs_to_before_save_for_#{reflection.name}".to_sym
-          define_method(method_name) do
-            association = association_instance_get(reflection.name)
-            if association && association.target
-              if association.new_record?
-                association.save(true)
-              end
-
-              if association.updated?
-                self[reflection.primary_key_name] = association.id
-                self[reflection.options[:foreign_type]] = association.class.base_class.name.to_s
-              end
-            end
-          end
-          before_save method_name
         else
           association_accessor_methods(reflection, BelongsToAssociation)
           association_constructor_method(:build,  reflection, BelongsToAssociation)
           association_constructor_method(:create, reflection, BelongsToAssociation)
-
-          method_name = "belongs_to_before_save_for_#{reflection.name}".to_sym
-          define_method(method_name) do
-            if association = association_instance_get(reflection.name)
-              if association.new_record?
-                association.save(true)
-              end
-
-              if association.updated?
-                self[reflection.primary_key_name] = association.id
-              end
-            end
-          end
-          before_save method_name
         end
 
-        # Create the callbacks to update counter cache
-        if options[:counter_cache]
-          cache_column = options[:counter_cache] == true ?
-            "#{self.to_s.demodulize.underscore.pluralize}_count" :
-            options[:counter_cache]
-
-          method_name = "belongs_to_counter_cache_after_create_for_#{reflection.name}".to_sym
-          define_method(method_name) do
-            association = send(reflection.name)
-            association.class.increment_counter(cache_column, send(reflection.primary_key_name)) unless association.nil?
-          end
-          after_create method_name
-
-          method_name = "belongs_to_counter_cache_before_destroy_for_#{reflection.name}".to_sym
-          define_method(method_name) do
-            association = send(reflection.name)
-            association.class.decrement_counter(cache_column, send(reflection.primary_key_name)) unless association.nil?
-          end
-          before_destroy method_name
-
-          module_eval(
-            "#{reflection.class_name}.send(:attr_readonly,\"#{cache_column}\".intern) if defined?(#{reflection.class_name}) && #{reflection.class_name}.respond_to?(:attr_readonly)"
-          )
-        end
-
-        add_single_associated_validation_callbacks(reflection.name) if options[:validate] == true
+        add_counter_cache_callbacks(reflection)          if options[:counter_cache]
+        add_touch_callbacks(reflection, options[:touch]) if options[:touch]
 
         configure_dependency_for_belongs_to(reflection)
       end
@@ -1234,9 +1174,6 @@ module ActiveRecord
       #   'DELETE FROM developers_projects WHERE active=1 AND developer_id = #{id} AND project_id = #{record.id}'
       def has_and_belongs_to_many(association_id, options = {}, &extension)
         reflection = create_has_and_belongs_to_many_reflection(association_id, options, &extension)
-
-        add_multiple_associated_validation_callbacks(reflection.name) unless options[:validate] == false
-        add_multiple_associated_save_callbacks(reflection.name)
         collection_accessor_methods(reflection, HasAndBelongsToManyAssociation)
 
         # Don't use a before_destroy callback since users' before_destroy
@@ -1358,70 +1295,6 @@ module ActiveRecord
           end
         end
 
-        def add_single_associated_validation_callbacks(association_name)
-          method_name = "validate_associated_records_for_#{association_name}".to_sym
-          define_method(method_name) do
-            if association = association_instance_get(association_name)
-              errors.add association_name unless association.target.nil? || association.valid?
-            end
-          end
-
-          validate method_name
-        end
-
-        def add_multiple_associated_validation_callbacks(association_name)
-          method_name = "validate_associated_records_for_#{association_name}".to_sym
-          define_method(method_name) do
-            association = association_instance_get(association_name)
-
-            if association
-              if new_record?
-                association
-              elsif association.loaded?
-                association.select { |record| record.new_record? }
-              else
-                association.target.select { |record| record.new_record? }
-              end.each do |record|
-                errors.add association_name unless record.valid?
-              end
-            end
-          end
-
-          validate method_name
-        end
-
-        def add_multiple_associated_save_callbacks(association_name)
-          method_name = "before_save_associated_records_for_#{association_name}".to_sym
-          define_method(method_name) do
-            @new_record_before_save = new_record?
-            true
-          end
-          before_save method_name
-
-          method_name = "after_create_or_update_associated_records_for_#{association_name}".to_sym
-          define_method(method_name) do
-            association = association_instance_get(association_name)
-
-            records_to_save = if @new_record_before_save
-              association
-            elsif association && association.loaded?
-              association.select { |record| record.new_record? }
-            elsif association && !association.loaded?
-              association.target.select { |record| record.new_record? }
-            else
-              []
-            end
-            records_to_save.each { |record| association.send(:insert_record, record) } unless records_to_save.blank?
-
-            # reconstruct the SQL queries now that we know the owner's id
-            association.send(:construct_sql) if association.respond_to?(:construct_sql)
-          end
-
-          # Doesn't use after_save as that would save associations added in after_create/after_update twice
-          after_create method_name
-          after_update method_name
-        end
-
         def association_constructor_method(constructor, reflection, association_proxy_class)
           define_method("#{constructor}_#{reflection.name}") do |*params|
             attributees      = params.first unless params.empty?
@@ -1439,6 +1312,43 @@ module ActiveRecord
               association.send(constructor, attributees)
             end
           end
+        end
+
+        def add_counter_cache_callbacks(reflection)
+          cache_column = reflection.counter_cache_column
+
+          method_name = "belongs_to_counter_cache_after_create_for_#{reflection.name}".to_sym
+          define_method(method_name) do
+            association = send(reflection.name)
+            association.class.increment_counter(cache_column, send(reflection.primary_key_name)) unless association.nil?
+          end
+          after_create(method_name)
+
+          method_name = "belongs_to_counter_cache_before_destroy_for_#{reflection.name}".to_sym
+          define_method(method_name) do
+            association = send(reflection.name)
+            association.class.decrement_counter(cache_column, send(reflection.primary_key_name)) unless association.nil?
+          end
+          before_destroy(method_name)
+
+          module_eval(
+            "#{reflection.class_name}.send(:attr_readonly,\"#{cache_column}\".intern) if defined?(#{reflection.class_name}) && #{reflection.class_name}.respond_to?(:attr_readonly)"
+          )
+        end
+        
+        def add_touch_callbacks(reflection, touch_attribute)
+          method_name = "belongs_to_touch_after_save_or_destroy_for_#{reflection.name}".to_sym
+          define_method(method_name) do
+            association = send(reflection.name)
+            
+            if touch_attribute == true
+              association.touch unless association.nil?
+            else
+              association.touch(touch_attribute) unless association.nil?
+            end
+          end
+          after_save(method_name)
+          after_destroy(method_name)
         end
 
         def find_with_associations(options = {})
@@ -1465,7 +1375,7 @@ module ActiveRecord
             dependent_conditions = []
             dependent_conditions << "#{reflection.primary_key_name} = \#{record.quoted_id}"
             dependent_conditions << "#{reflection.options[:as]}_type = '#{base_class.name}'" if reflection.options[:as]
-            dependent_conditions << sanitize_sql(reflection.options[:conditions]) if reflection.options[:conditions]
+            dependent_conditions << sanitize_sql(reflection.options[:conditions], reflection.quoted_table_name) if reflection.options[:conditions]
             dependent_conditions << extra_conditions if extra_conditions
             dependent_conditions = dependent_conditions.collect {|where| "(#{where})" }.join(" AND ")
             dependent_conditions = dependent_conditions.gsub('@', '\@')
@@ -1611,7 +1521,7 @@ module ActiveRecord
         @@valid_keys_for_belongs_to_association = [
           :class_name, :foreign_key, :foreign_type, :remote, :select, :conditions,
           :include, :dependent, :counter_cache, :extend, :polymorphic, :readonly,
-          :validate
+          :validate, :touch
         ]
 
         def create_belongs_to_reflection(association_id, options)
@@ -1642,6 +1552,10 @@ module ActiveRecord
           options[:extend] = create_extension_modules(association_id, extension, options[:extend])
 
           reflection = create_reflection(:has_and_belongs_to_many, association_id, options, self)
+          
+          if reflection.association_foreign_key == reflection.primary_key_name
+            raise HasAndBelongsToManyAssociationForeignKeyNeeded.new(reflection)
+          end
 
           reflection.options[:join_table] ||= join_table_name(undecorated_table_name(self.to_s), undecorated_table_name(reflection.class_name))
 
@@ -1964,9 +1878,10 @@ module ActiveRecord
             def construct(parent, associations, joins, row)
               case associations
                 when Symbol, String
-                  while (join = joins.shift).reflection.name.to_s != associations.to_s
-                    raise ConfigurationError, "Not Enough Associations" if joins.empty?
-                  end
+                  join = joins.detect{|j| j.reflection.name.to_s == associations.to_s && j.parent_table_name == parent.class.table_name }
+                  raise(ConfigurationError, "No such association") if join.nil?
+
+                  joins.delete(join)
                   construct_association(parent, join, row)
                 when Array
                   associations.each do |association|
@@ -1974,7 +1889,11 @@ module ActiveRecord
                   end
                 when Hash
                   associations.keys.sort{|a,b|a.to_s<=>b.to_s}.each do |name|
-                    association = construct_association(parent, joins.shift, row)
+                    join = joins.detect{|j| j.reflection.name.to_s == name.to_s && j.parent_table_name == parent.class.table_name }
+                    raise(ConfigurationError, "No such association") if join.nil?
+
+                    association = construct_association(parent, join, row)
+                    joins.delete(join)
                     construct(association, associations[name], joins, row) if association
                   end
                 else
@@ -2204,7 +2123,7 @@ module ActiveRecord
                 klass.send(:type_condition, aliased_table_name)] unless klass.descends_from_active_record?
 
               [through_reflection, reflection].each do |ref|
-                join << "AND #{interpolate_sql(sanitize_sql(ref.options[:conditions]))} " if ref && ref.options[:conditions]
+                join << "AND #{interpolate_sql(sanitize_sql(ref.options[:conditions], aliased_table_name))} " if ref && ref.options[:conditions]
               end
 
               join
