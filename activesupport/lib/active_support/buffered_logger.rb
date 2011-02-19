@@ -53,7 +53,6 @@ module ActiveSupport
         FileUtils.mkdir_p(File.dirname(log))
         @log = open(log, (File::WRONLY | File::APPEND | File::CREAT))
         @log.sync = true
-        @log.write("# Logfile created on %s" % [Time.now.to_s])
       end
     end
 
@@ -68,6 +67,10 @@ module ActiveSupport
       message
     end
 
+    # Dynamically add methods such as:
+    # def info
+    # def warn
+    # def debug
     for severity in Severity.constants
       class_eval <<-EOT, __FILE__, __LINE__ + 1
         def #{severity.downcase}(message = nil, progname = nil, &block) # def debug(message = nil, progname = nil, &block)
@@ -98,7 +101,11 @@ module ActiveSupport
       @guard.synchronize do
         unless buffer.empty?
           old_buffer = buffer
-          @log.write(old_buffer.join)
+          all_content = StringIO.new
+          old_buffer.each do |content|
+            all_content << content
+          end
+          @log.write(all_content.string)
         end
 
         # Important to do this even if buffer was empty or else @buffer will

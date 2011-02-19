@@ -2,10 +2,14 @@
 require 'abstract_unit'
 require 'controller/fake_models'
 
+class TestController < ActionController::Base
+end
+
 module RenderTestCases
   def setup_view(paths)
     @assigns = { :secret => 'in the sauce' }
     @view = ActionView::Base.new(paths, @assigns)
+    @controller_view = TestController.new.view_context
 
     # Reload and register danish language for testing
     I18n.reload!
@@ -13,7 +17,7 @@ module RenderTestCases
     I18n.backend.store_translations 'pt-BR', {}
 
     # Ensure original are still the same since we are reindexing view paths
-    assert_equal ORIGINAL_LOCALES, I18n.available_locales.map(&:to_s).sort
+    assert_equal ORIGINAL_LOCALES, I18n.available_locales.map {|l| l.to_s }.sort
   end
 
   def test_render_file
@@ -29,44 +33,17 @@ module RenderTestCases
   end
 
   def test_render_file_with_localization
-    begin
-      old_locale = I18n.locale
-      I18n.locale = :da
-      assert_equal "Hey verden", @view.render(:file => "test/hello_world")
-    ensure
-      I18n.locale = old_locale
-    end
+    old_locale, @view.locale = @view.locale, :da
+    assert_equal "Hey verden", @view.render(:file => "test/hello_world")
+  ensure
+    @view.locale = old_locale
   end
 
   def test_render_file_with_dashed_locale
-    old_locale = I18n.locale
-    I18n.locale = :"pt-BR"
+    old_locale, @view.locale = @view.locale, :"pt-BR"
     assert_equal "Ola mundo", @view.render(:file => "test/hello_world")
   ensure
-    I18n.locale = old_locale
-  end
-
-  def test_render_implicit_html_template_from_xhr_request
-    old_format = @view.formats
-    pending do
-      @view.formats = [:js]
-      assert_equal "Hello HTML!", @view.render(:file => "test/render_implicit_html_template_from_xhr_request")
-    end
-  ensure
-    @view.formats = old_format
-  end
-
-  def test_render_implicit_html_template_from_xhr_request_with_localization
-    old_locale = I18n.locale
-    old_format = @view.formats
-    pending do
-      I18n.locale = :da
-      @view.formats = [:js]
-      assert_equal "Hey HTML!\n", @view.render(:file => "test/render_implicit_html_template_from_xhr_request")
-    end
-  ensure
-    I18n.locale = old_locale
-    @view.formats = old_format
+    @view.locale = old_locale
   end
 
   def test_render_file_at_top_level
@@ -92,8 +69,6 @@ module RenderTestCases
   end
 
   def test_render_update
-    # TODO: You should not have to stub out template because template is self!
-    @view.instance_variable_set(:@template, @view)
     assert_equal 'alert("Hello, World!");', @view.render(:update) { |page| page.alert('Hello, World!') }
   end
 
@@ -129,21 +104,33 @@ module RenderTestCases
 
   def test_render_partial_with_errors
     @view.render(:partial => "test/raise")
-    flunk "Render did not raise TemplateError"
-  rescue ActionView::TemplateError => e
-    assert_match "undefined local variable or method `doesnt_exist'", e.message
+    flunk "Render did not raise Template::Error"
+  rescue ActionView::Template::Error => e
+    assert_match %r!method.*doesnt_exist!, e.message
     assert_equal "", e.sub_template_message
     assert_equal "1", e.line_number
+    assert_equal "1: <%= doesnt_exist %>", e.annoted_source_code.strip
     assert_equal File.expand_path("#{FIXTURE_LOAD_PATH}/test/_raise.html.erb"), e.file_name
   end
 
   def test_render_sub_template_with_errors
-    @view.render(:file => "test/sub_template_raise")
-    flunk "Render did not raise TemplateError"
-  rescue ActionView::TemplateError => e
-    assert_match "undefined local variable or method `doesnt_exist'", e.message
+    @view.render(:template => "test/sub_template_raise")
+    flunk "Render did not raise Template::Error"
+  rescue ActionView::Template::Error => e
+    assert_match %r!method.*doesnt_exist!, e.message
     assert_equal "Trace of template inclusion: #{File.expand_path("#{FIXTURE_LOAD_PATH}/test/sub_template_raise.html.erb")}", e.sub_template_message
     assert_equal "1", e.line_number
+    assert_equal File.expand_path("#{FIXTURE_LOAD_PATH}/test/_raise.html.erb"), e.file_name
+  end
+
+  def test_render_file_with_errors
+    @view.render(:file => File.expand_path("test/_raise", FIXTURE_LOAD_PATH))
+    flunk "Render did not raise Template::Error"
+  rescue ActionView::Template::Error => e
+    assert_match %r!method.*doesnt_exist!, e.message
+    assert_equal "", e.sub_template_message
+    assert_equal "1", e.line_number
+    assert_equal "1: <%= doesnt_exist %>", e.annoted_source_code.strip
     assert_equal File.expand_path("#{FIXTURE_LOAD_PATH}/test/_raise.html.erb"), e.file_name
   end
 
@@ -151,17 +138,26 @@ module RenderTestCases
     assert_equal "Hello: david", @view.render(:partial => "test/customer", :object => Customer.new("david"))
   end
 
+  def test_render_object_with_array
+    assert_equal "[1, 2, 3]", @view.render(:partial => "test/object_inspector", :object => [1, 2, 3])
+  end
+
   def test_render_partial_collection
     assert_equal "Hello: davidHello: mary", @view.render(:partial => "test/customer", :collection => [ Customer.new("david"), Customer.new("mary") ])
   end
 
-  def test_render_partial_collection_as
+  def test_render_partial_collection_as_by_string
+    assert_equal "david david davidmary mary mary",
+      @view.render(:partial => "test/customer_with_var", :collection => [ Customer.new("david"), Customer.new("mary") ], :as => 'customer')
+  end
+
+  def test_render_partial_collection_as_by_symbol
     assert_equal "david david davidmary mary mary",
       @view.render(:partial => "test/customer_with_var", :collection => [ Customer.new("david"), Customer.new("mary") ], :as => :customer)
   end
 
   def test_render_partial_collection_without_as
-    assert_equal "local_inspector,local_inspector_counter,object",
+    assert_equal "local_inspector,local_inspector_counter",
       @view.render(:partial => "test/local_inspector", :collection => [ Customer.new("mary") ])
   end
 
@@ -181,6 +177,25 @@ module RenderTestCases
     assert_nil @view.render(:partial => [])
   end
 
+  def test_render_partial_using_string
+    assert_equal "Hello: Anonymous", @controller_view.render('customer')
+  end
+
+  def test_render_partial_with_locals_using_string
+    assert_equal "Hola: david", @controller_view.render('customer_greeting', :greeting => 'Hola', :customer_greeting => Customer.new("david"))
+  end
+
+  def test_render_partial_using_object
+    assert_equal "Hello: lifo",
+      @controller_view.render(Customer.new("lifo"), :greeting => "Hello")
+  end
+
+  def test_render_partial_using_collection
+    customers = [ Customer.new("Amazon"), Customer.new("Yahoo") ]
+    assert_equal "Hello: AmazonHello: Yahoo",
+      @controller_view.render(customers, :greeting => "Hello")
+  end
+
   # TODO: The reason for this test is unclear, improve documentation
   def test_render_partial_and_fallback_to_layout
     assert_equal "Before (Josh)\n\nAfter", @view.render(:partial => "test/layout_for_partial", :locals => { :name => "Josh" })
@@ -190,6 +205,13 @@ module RenderTestCases
   def test_render_missing_xml_partial_and_raise_missing_template
     @view.formats = [:xml]
     assert_raise(ActionView::MissingTemplate) { @view.render(:partial => "test/layout_for_partial") }
+  ensure
+    @view.formats = nil
+  end
+
+  def test_render_layout_with_block_and_other_partial_inside
+    render = @view.render(:layout => "test/layout_with_partial_and_yield.html.erb") { "Yield!" }
+    assert_equal "Before\npartial html\nYield!\nAfter\n", render
   end
 
   def test_render_inline
@@ -209,6 +231,20 @@ module RenderTestCases
       "@output_buffer << 'source: #{template.source.inspect}'\n"
   end
 
+  WithViewHandler = lambda do |template, view|
+    %'"#{template.class} #{view.class}"'
+  end
+
+  def test_render_inline_with_render_from_to_proc
+    ActionView::Template.register_template_handler :ruby_handler, :source.to_proc
+    assert_equal '3', @view.render(:inline => "(1 + 2).to_s", :type => :ruby_handler)
+  end
+
+  def test_render_inline_with_template_handler_with_view
+    ActionView::Template.register_template_handler :with_view, WithViewHandler
+    assert_equal 'ActionView::Template ActionView::Base', @view.render(:inline => "Hello, World!", :type => :with_view)
+  end
+
   def test_render_inline_with_compilable_custom_type
     ActionView::Template.register_template_handler :foo, CustomHandler
     assert_equal 'source: "Hello, World!"', @view.render(:inline => "Hello, World!", :type => :foo)
@@ -217,17 +253,6 @@ module RenderTestCases
   def test_render_inline_with_locals_and_compilable_custom_type
     ActionView::Template.register_template_handler :foo, CustomHandler
     assert_equal 'source: "Hello, <%= name %>!"', @view.render(:inline => "Hello, <%= name %>!", :locals => { :name => "Josh" }, :type => :foo)
-  end
-
-  class LegacyHandler < ActionView::TemplateHandler
-    def render(template, local_assigns)
-      "source: #{template.source}; locals: #{local_assigns.inspect}"
-    end
-  end
-
-  def test_render_legacy_handler_with_custom_type
-    ActionView::Template.register_template_handler :foo, LegacyHandler
-    assert_equal 'source: Hello, <%= name %>!; locals: {:name=>"Josh"}', @view.render(:inline => "Hello, <%= name %>!", :locals => { :name => "Josh" }, :type => :foo)
   end
 
   def test_render_ignores_templates_with_malformed_template_handlers
@@ -241,17 +266,69 @@ module RenderTestCases
       @view.render(:file => "test/hello_world.erb", :layout => "layouts/yield")
   end
 
+  def test_render_with_layout_which_has_render_inline
+    assert_equal %(welcome\nHello world!\n),
+      @view.render(:file => "test/hello_world.erb", :layout => "layouts/yield_with_render_inline_inside")
+  end
+
+  def test_render_with_layout_which_renders_another_partial
+    assert_equal %(partial html\nHello world!\n),
+      @view.render(:file => "test/hello_world.erb", :layout => "layouts/yield_with_render_partial_inside")
+  end
+
+  def test_render_layout_with_block_and_yield
+    assert_equal %(Content from block!\n),
+      @view.render(:layout => "layouts/yield_only") { "Content from block!" }
+  end
+
+  def test_render_layout_with_block_and_yield_with_params
+    assert_equal %(Yield! Content from block!\n),
+      @view.render(:layout => "layouts/yield_with_params") { |param| "#{param} Content from block!" }
+  end
+
+  def test_render_layout_with_block_which_renders_another_partial_and_yields
+    assert_equal %(partial html\nContent from block!\n),
+      @view.render(:layout => "layouts/partial_and_yield") { "Content from block!" }
+  end
+
+  def test_render_partial_and_layout_without_block_with_locals
+    assert_equal %(Before (Foo!)\npartial html\nAfter),
+      @view.render(:partial => 'test/partial', :layout => 'test/layout_for_partial', :locals => { :name => 'Foo!'})
+  end
+
+  def test_render_partial_and_layout_without_block_with_locals_and_rendering_another_partial
+    assert_equal %(Before (Foo!)\npartial html\npartial with partial\n\nAfter),
+      @view.render(:partial => 'test/partial_with_partial', :layout => 'test/layout_for_partial', :locals => { :name => 'Foo!'})
+  end
+
+  def test_render_layout_with_a_nested_render_layout_call
+    assert_equal %(Before (Foo!)\nBefore (Bar!)\npartial html\nAfter\npartial with layout\n\nAfter),
+      @view.render(:partial => 'test/partial_with_layout', :layout => 'test/layout_for_partial', :locals => { :name => 'Foo!'})
+  end
+
+  def test_render_layout_with_a_nested_render_layout_call_using_block_with_render_partial
+    assert_equal %(Before (Foo!)\nBefore (Bar!)\n\n  partial html\n\nAfterpartial with layout\n\nAfter),
+      @view.render(:partial => 'test/partial_with_layout_block_partial', :layout => 'test/layout_for_partial', :locals => { :name => 'Foo!'})
+  end
+
+  def test_render_layout_with_a_nested_render_layout_call_using_block_with_render_content
+    assert_equal %(Before (Foo!)\nBefore (Bar!)\n\n  Content from inside layout!\n\nAfterpartial with layout\n\nAfter),
+      @view.render(:partial => 'test/partial_with_layout_block_content', :layout => 'test/layout_for_partial', :locals => { :name => 'Foo!'})
+  end
+
   def test_render_with_nested_layout
-    assert_equal %(<title>title</title>\n<div id="column">column</div>\n<div id="content">content</div>\n),
+    assert_equal %(<title>title</title>\n\n<div id="column">column</div>\n<div id="content">content</div>\n),
       @view.render(:file => "test/nested_layout.erb", :layout => "layouts/yield")
   end
 
-  if '1.9'.respond_to?(:force_encoding)
-    def test_render_utf8_template
-      result = @view.render(:file => "test/utf8.html.erb", :layouts => "layouts/yield")
-      assert_equal "Русский текст\n日本語のテキスト", result
-      assert_equal Encoding::UTF_8, result.encoding
-    end
+  def test_render_with_file_in_layout
+    assert_equal %(\n<title>title</title>\n\n),
+      @view.render(:file => "test/layout_render_file.erb")
+  end
+
+  def test_render_layout_with_object
+    assert_equal %(<title>David</title>),
+      @view.render(:file => "test/layout_render_object.erb")
   end
 end
 
@@ -261,8 +338,12 @@ class CachedViewRenderTest < ActiveSupport::TestCase
   # Ensure view path cache is primed
   def setup
     view_paths = ActionController::Base.view_paths
-    assert_equal ActionView::Template::FileSystemPathWithFallback, view_paths.first.class
+    assert_equal ActionView::FileSystemResolver, view_paths.first.class
     setup_view(view_paths)
+  end
+
+  def teardown
+    GC.start
   end
 end
 
@@ -272,9 +353,61 @@ class LazyViewRenderTest < ActiveSupport::TestCase
   # Test the same thing as above, but make sure the view path
   # is not eager loaded
   def setup
-    path = ActionView::Template::FileSystemPathWithFallback.new(FIXTURE_LOAD_PATH)
+    path = ActionView::FileSystemResolver.new(FIXTURE_LOAD_PATH)
     view_paths = ActionView::Base.process_view_paths(path)
-    assert_equal ActionView::Template::FileSystemPathWithFallback, view_paths.first.class
+    assert_equal ActionView::FileSystemResolver.new(FIXTURE_LOAD_PATH), view_paths.first
     setup_view(view_paths)
+  end
+
+  def teardown
+    GC.start
+  end
+
+  if '1.9'.respond_to?(:force_encoding)
+    def test_render_utf8_template_with_magic_comment
+      with_external_encoding Encoding::ASCII_8BIT do
+        result = @view.render(:file => "test/utf8_magic.html.erb", :layouts => "layouts/yield")
+        assert_equal Encoding::UTF_8, result.encoding
+        assert_equal "\nРусский \nтекст\n\nUTF-8\nUTF-8\nUTF-8\n", result
+      end
+    end
+
+    def test_render_utf8_template_with_default_external_encoding
+      with_external_encoding Encoding::UTF_8 do
+        result = @view.render(:file => "test/utf8.html.erb", :layouts => "layouts/yield")
+        assert_equal Encoding::UTF_8, result.encoding
+        assert_equal "Русский текст\n\nUTF-8\nUTF-8\nUTF-8\n", result
+      end
+    end
+
+    def test_render_utf8_template_with_incompatible_external_encoding
+      with_external_encoding Encoding::SJIS do
+        begin
+          result = @view.render(:file => "test/utf8.html.erb", :layouts => "layouts/yield")
+          flunk 'Should have raised incompatible encoding error'
+        rescue ActionView::Template::Error => error
+          assert_match 'Your template was not saved as valid Shift_JIS', error.original_exception.message
+        end
+      end
+    end
+
+    def test_render_utf8_template_with_partial_with_incompatible_encoding
+      with_external_encoding Encoding::SJIS do
+        begin
+          result = @view.render(:file => "test/utf8_magic_with_bare_partial.html.erb", :layouts => "layouts/yield")
+          flunk 'Should have raised incompatible encoding error'
+        rescue ActionView::Template::Error => error
+          assert_match 'Your template was not saved as valid Shift_JIS', error.original_exception.message
+        end
+      end
+    end
+
+    def with_external_encoding(encoding)
+      old = Encoding.default_external
+      silence_warnings { Encoding.default_external = encoding }
+      yield
+    ensure
+      silence_warnings { Encoding.default_external = old }
+    end
   end
 end

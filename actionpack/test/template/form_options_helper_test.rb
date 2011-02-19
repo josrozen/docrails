@@ -7,7 +7,7 @@ class FormOptionsHelperTest < ActionView::TestCase
   tests ActionView::Helpers::FormOptionsHelper
 
   silence_warnings do
-    Post        = Struct.new('Post', :title, :author_name, :body, :secret, :written_on, :category, :origin)
+    Post        = Struct.new('Post', :title, :author_name, :body, :secret, :written_on, :category, :origin, :allow_comments)
     Continent   = Struct.new('Continent', :continent_name, :countries)
     Country     = Struct.new('Country', :country_id, :country_name)
     Firm        = Struct.new('Firm', :time_zone)
@@ -80,6 +80,14 @@ class FormOptionsHelperTest < ActionView::TestCase
     )
   end
 
+  def test_string_options_for_select
+    options = "<option value=\"Denmark\">Denmark</option><option value=\"USA\">USA</option><option value=\"Sweden\">Sweden</option>"
+    assert_dom_equal(
+      options,
+      options_for_select(options)
+    )
+  end
+
   def test_array_options_for_select
     assert_dom_equal(
       "<option value=\"&lt;Denmark&gt;\">&lt;Denmark&gt;</option>\n<option value=\"USA\">USA</option>\n<option value=\"Sweden\">Sweden</option>",
@@ -119,6 +127,13 @@ class FormOptionsHelperTest < ActionView::TestCase
     assert_dom_equal(
       "<option value=\"Denmark\" selected=\"selected\">Denmark</option>\n<option value=\"&lt;USA&gt;\" disabled=\"disabled\">&lt;USA&gt;</option>\n<option value=\"Sweden\">Sweden</option>",
       options_for_select([ "Denmark", "<USA>", "Sweden" ], :selected => "Denmark", :disabled => "<USA>")
+    )
+  end
+
+  def test_boolean_array_options_for_select_with_selection_and_disabled_value
+    assert_dom_equal(
+      "<option value=\"true\">true</option>\n<option value=\"false\" selected=\"selected\">false</option>",
+      options_for_select([ true, false ], :selected => false, :disabled => nil)
     )
   end
 
@@ -168,16 +183,77 @@ class FormOptionsHelperTest < ActionView::TestCase
     )
   end
 
-  def test_option_groups_from_collection_for_select
-    @continents = [
-      Continent.new("<Africa>", [Country.new("<sa>", "<South Africa>"), Country.new("so", "Somalia")] ),
-      Continent.new("Europe", [Country.new("dk", "Denmark"), Country.new("ie", "Ireland")] )
-    ]
+  def test_collection_options_with_preselected_value_as_string_and_option_value_is_integer
+    albums = [ Album.new(1, "first","rap"), Album.new(2, "second","pop")]
+    assert_dom_equal(
+    %(<option selected="selected" value="1">rap</option>\n<option value="2">pop</option>),
+    options_from_collection_for_select(albums, "id", "genre", :selected => "1")
+    )
+  end
+
+  def test_collection_options_with_preselected_value_as_integer_and_option_value_is_string
+    albums = [ Album.new("1", "first","rap"), Album.new("2", "second","pop")]
 
     assert_dom_equal(
-      "<optgroup label=\"&lt;Africa&gt;\"><option value=\"&lt;sa&gt;\">&lt;South Africa&gt;</option>\n<option value=\"so\">Somalia</option></optgroup><optgroup label=\"Europe\"><option value=\"dk\" selected=\"selected\">Denmark</option>\n<option value=\"ie\">Ireland</option></optgroup>",
-      option_groups_from_collection_for_select(@continents, "countries", "continent_name", "country_id", "country_name", "dk")
+    %(<option selected="selected" value="1">rap</option>\n<option value="2">pop</option>),
+    options_from_collection_for_select(albums, "id", "genre", :selected => 1)
     )
+  end
+
+  def test_collection_options_with_preselected_value_as_string_and_option_value_is_float
+    albums = [ Album.new(1.0, "first","rap"), Album.new(2.0, "second","pop")]
+
+    assert_dom_equal(
+    %(<option value="1.0">rap</option>\n<option value="2.0" selected="selected">pop</option>),
+    options_from_collection_for_select(albums, "id", "genre", :selected => "2.0")
+    )
+  end
+
+  def test_collection_options_with_preselected_value_as_nil
+    albums = [ Album.new(1.0, "first","rap"), Album.new(2.0, "second","pop")]
+
+    assert_dom_equal(
+    %(<option value="1.0">rap</option>\n<option value="2.0">pop</option>),
+    options_from_collection_for_select(albums, "id", "genre", :selected => nil)
+    )
+  end
+
+  def test_collection_options_with_disabled_value_as_nil
+    albums = [ Album.new(1.0, "first","rap"), Album.new(2.0, "second","pop")]
+
+    assert_dom_equal(
+    %(<option value="1.0">rap</option>\n<option value="2.0">pop</option>),
+    options_from_collection_for_select(albums, "id", "genre", :disabled => nil)
+    )
+  end
+
+  def test_collection_options_with_disabled_value_as_array
+    albums = [ Album.new(1.0, "first","rap"), Album.new(2.0, "second","pop")]
+
+    assert_dom_equal(
+    %(<option disabled="disabled" value="1.0">rap</option>\n<option disabled="disabled" value="2.0">pop</option>),
+    options_from_collection_for_select(albums, "id", "genre", :disabled => ["1.0", 2.0])
+    )
+  end
+
+  def test_collection_options_with_preselected_values_as_string_array_and_option_value_is_float
+    albums = [ Album.new(1.0, "first","rap"), Album.new(2.0, "second","pop"), Album.new(3.0, "third","country") ]
+
+    assert_dom_equal(
+    %(<option value="1.0" selected="selected">rap</option>\n<option value="2.0">pop</option>\n<option value="3.0" selected="selected">country</option>),
+    options_from_collection_for_select(albums, "id", "genre", ["1.0","3.0"])
+    )
+  end
+
+  def test_option_groups_from_collection_for_select
+    assert_dom_equal(
+      "<optgroup label=\"&lt;Africa&gt;\"><option value=\"&lt;sa&gt;\">&lt;South Africa&gt;</option>\n<option value=\"so\">Somalia</option></optgroup><optgroup label=\"Europe\"><option value=\"dk\" selected=\"selected\">Denmark</option>\n<option value=\"ie\">Ireland</option></optgroup>",
+      option_groups_from_collection_for_select(dummy_continents, "countries", "continent_name", "country_id", "country_name", "dk")
+    )
+  end
+
+  def test_option_groups_from_collection_for_select_returns_html_safe_string
+    assert option_groups_from_collection_for_select(dummy_continents, "countries", "continent_name", "country_id", "country_name", "dk").html_safe?
   end
 
   def test_grouped_options_for_select_with_array
@@ -197,6 +273,16 @@ class FormOptionsHelperTest < ActionView::TestCase
         "<option value=\"\">Choose a product...</option><optgroup label=\"Hats\"><option value=\"Baseball Cap\">Baseball Cap</option>\n<option selected=\"selected\" value=\"Cowboy Hat\">Cowboy Hat</option></optgroup>",
         grouped_options_for_select([["Hats", ["Baseball Cap","Cowboy Hat"]]], "Cowboy Hat", "Choose a product...")
     )
+  end
+
+  def test_grouped_options_for_select_returns_html_safe_string
+    assert grouped_options_for_select([["Hats", ["Baseball Cap","Cowboy Hat"]]]).html_safe?
+  end
+
+  def test_grouped_options_for_select_with_prompt_returns_html_escaped_string
+    assert_dom_equal(
+      "<option value=\"\">&lt;Choose One&gt;</option><optgroup label=\"Hats\"><option value=\"Baseball Cap\">Baseball Cap</option>\n<option value=\"Cowboy Hat\">Cowboy Hat</option></optgroup>",
+      grouped_options_for_select([["Hats", ["Baseball Cap","Cowboy Hat"]]], nil, '<Choose One>'))
   end
 
   def test_optgroups_with_with_options_with_hash
@@ -272,6 +358,10 @@ class FormOptionsHelperTest < ActionView::TestCase
                  opts
   end
 
+  def test_time_zone_options_returns_html_safe_string
+    assert time_zone_options_for_select.html_safe?
+  end
+
   def test_select
     @post = Post.new
     @post.category = "<mus>"
@@ -281,14 +371,23 @@ class FormOptionsHelperTest < ActionView::TestCase
     )
   end
 
+  def test_select_with_boolean_method
+    @post = Post.new
+    @post.allow_comments = false
+    assert_dom_equal(
+      "<select id=\"post_allow_comments\" name=\"post[allow_comments]\"><option value=\"true\">true</option>\n<option value=\"false\" selected=\"selected\">false</option></select>",
+      select("post", "allow_comments", %w( true false ))
+    )
+  end
+
   def test_select_under_fields_for
     @post = Post.new
     @post.category = "<mus>"
 
-    fields_for :post, @post do |f|
+    output_buffer = fields_for :post, @post do |f|
       concat f.select(:category, %w( abe <mus> hest))
     end
-  
+
     assert_dom_equal(
       "<select id=\"post_category\" name=\"post[category]\"><option value=\"abe\">abe</option>\n<option value=\"&lt;mus&gt;\" selected=\"selected\">&lt;mus&gt;</option>\n<option value=\"hest\">hest</option></select>",
       output_buffer
@@ -299,7 +398,7 @@ class FormOptionsHelperTest < ActionView::TestCase
     @post = Post.new
     @post.category = "<mus>"
 
-    fields_for :post, @post, :index => 108 do |f|
+    output_buffer = fields_for :post, @post, :index => 108 do |f|
       concat f.select(:category, %w( abe <mus> hest))
     end
 
@@ -314,12 +413,26 @@ class FormOptionsHelperTest < ActionView::TestCase
     @post.category = "<mus>"
     def @post.to_param; 108; end
 
-    fields_for "post[]", @post do |f|
+    output_buffer = fields_for "post[]", @post do |f|
       concat f.select(:category, %w( abe <mus> hest))
     end
 
     assert_dom_equal(
       "<select id=\"post_108_category\" name=\"post[108][category]\"><option value=\"abe\">abe</option>\n<option value=\"&lt;mus&gt;\" selected=\"selected\">&lt;mus&gt;</option>\n<option value=\"hest\">hest</option></select>",
+      output_buffer
+    )
+  end
+
+  def test_select_under_fields_for_with_string_and_given_prompt
+    @post = Post.new
+    options = "<option value=\"abe\">abe</option><option value=\"mus\">mus</option><option value=\"hest\">hest</option>"
+
+    output_buffer = fields_for :post, @post do |f|
+      concat f.select(:category, options, :prompt => 'The prompt')
+    end
+
+    assert_dom_equal(
+      "<select id=\"post_category\" name=\"post[category]\"><option value=\"\">The prompt</option>\n#{options}</select>",
       output_buffer
     )
   end
@@ -339,6 +452,15 @@ class FormOptionsHelperTest < ActionView::TestCase
     assert_dom_equal(
       "<select id=\"post_category\" name=\"post[category]\"><option value=\"\">None</option>\n<option value=\"abe\">abe</option>\n<option value=\"&lt;mus&gt;\" selected=\"selected\">&lt;mus&gt;</option>\n<option value=\"hest\">hest</option></select>",
       select("post", "category", %w( abe <mus> hest), :include_blank => 'None')
+    )
+  end
+
+  def test_select_with_blank_as_string_escaped
+    @post = Post.new
+    @post.category = "<mus>"
+    assert_dom_equal(
+      "<select id=\"post_category\" name=\"post[category]\"><option value=\"\">&lt;None&gt;</option>\n<option value=\"abe\">abe</option>\n<option value=\"&lt;mus&gt;\" selected=\"selected\">&lt;mus&gt;</option>\n<option value=\"hest\">hest</option></select>",
+      select("post", "category", %w( abe <mus> hest), :include_blank => '<None>')
     )
   end
 
@@ -369,6 +491,14 @@ class FormOptionsHelperTest < ActionView::TestCase
     )
   end
 
+  def test_select_with_given_prompt_escaped
+    @post = Post.new
+    assert_dom_equal(
+      "<select id=\"post_category\" name=\"post[category]\"><option value=\"\">&lt;The prompt&gt;</option>\n<option value=\"abe\">abe</option>\n<option value=\"&lt;mus&gt;\">&lt;mus&gt;</option>\n<option value=\"hest\">hest</option></select>",
+      select("post", "category", %w( abe <mus> hest), :prompt => '<The prompt>')
+    )
+  end
+
   def test_select_with_prompt_and_blank
     @post = Post.new
     @post.category = ""
@@ -390,11 +520,11 @@ class FormOptionsHelperTest < ActionView::TestCase
   def test_select_with_index_option
     @album = Album.new
     @album.id = 1
-  
-    expected = "<select id=\"album__genre\" name=\"album[][genre]\"><option value=\"rap\">rap</option>\n<option value=\"rock\">rock</option>\n<option value=\"country\">country</option></select>"    
+
+    expected = "<select id=\"album__genre\" name=\"album[][genre]\"><option value=\"rap\">rap</option>\n<option value=\"rock\">rock</option>\n<option value=\"country\">country</option></select>"
 
     assert_dom_equal(
-      expected, 
+      expected,
       select("album[]", "genre", %w[rap rock country], {}, { :index => nil })
     )
   end
@@ -440,10 +570,10 @@ class FormOptionsHelperTest < ActionView::TestCase
     @post = Post.new
     @post.author_name = "Babe"
 
-    fields_for :post, @post do |f|
+    output_buffer = fields_for :post, @post do |f|
       concat f.collection_select(:author_name, dummy_posts, :author_name, :author_name)
     end
-  
+
     assert_dom_equal(
       "<select id=\"post_author_name\" name=\"post[author_name]\"><option value=\"&lt;Abe&gt;\">&lt;Abe&gt;</option>\n<option value=\"Babe\" selected=\"selected\">Babe</option>\n<option value=\"Cabe\">Cabe</option></select>",
       output_buffer
@@ -454,7 +584,7 @@ class FormOptionsHelperTest < ActionView::TestCase
     @post = Post.new
     @post.author_name = "Babe"
 
-    fields_for :post, @post, :index => 815 do |f|
+    output_buffer = fields_for :post, @post, :index => 815 do |f|
       concat f.collection_select(:author_name, dummy_posts, :author_name, :author_name)
     end
 
@@ -469,7 +599,7 @@ class FormOptionsHelperTest < ActionView::TestCase
     @post.author_name = "Babe"
     def @post.to_param; 815; end
 
-    fields_for "post[]", @post do |f|
+    output_buffer = fields_for "post[]", @post do |f|
       concat f.collection_select(:author_name, dummy_posts, :author_name, :author_name)
     end
 
@@ -548,10 +678,10 @@ class FormOptionsHelperTest < ActionView::TestCase
   def test_time_zone_select_under_fields_for
     @firm = Firm.new("D")
 
-    fields_for :firm, @firm do |f|
+    output_buffer = fields_for :firm, @firm do |f|
       concat f.time_zone_select(:time_zone)
     end
-  
+
     assert_dom_equal(
       "<select id=\"firm_time_zone\" name=\"firm[time_zone]\">" +
       "<option value=\"A\">A</option>\n" +
@@ -567,7 +697,7 @@ class FormOptionsHelperTest < ActionView::TestCase
   def test_time_zone_select_under_fields_for_with_index
     @firm = Firm.new("D")
 
-    fields_for :firm, @firm, :index => 305 do |f|
+    output_buffer = fields_for :firm, @firm, :index => 305 do |f|
       concat f.time_zone_select(:time_zone)
     end
 
@@ -587,7 +717,7 @@ class FormOptionsHelperTest < ActionView::TestCase
     @firm = Firm.new("D")
     def @firm.to_param; 305; end
 
-    fields_for "firm[]", @firm do |f|
+    output_buffer = fields_for "firm[]", @firm do |f|
       concat f.time_zone_select(:time_zone)
     end
 
@@ -741,11 +871,96 @@ class FormOptionsHelperTest < ActionView::TestCase
                    html
   end
 
+  def test_options_for_select_with_element_attributes
+    assert_dom_equal(
+      "<option value=\"&lt;Denmark&gt;\" class=\"bold\">&lt;Denmark&gt;</option>\n<option value=\"USA\" onclick=\"alert('Hello World');\">USA</option>\n<option value=\"Sweden\">Sweden</option>\n<option value=\"Germany\">Germany</option>",
+      options_for_select([ [ "<Denmark>", { :class => 'bold' } ], [ "USA", { :onclick => "alert('Hello World');" } ], [ "Sweden" ], "Germany" ])
+    )
+  end
+
+  def test_options_for_select_with_element_attributes_and_selection
+    assert_dom_equal(
+      "<option value=\"&lt;Denmark&gt;\">&lt;Denmark&gt;</option>\n<option value=\"USA\" class=\"bold\" selected=\"selected\">USA</option>\n<option value=\"Sweden\">Sweden</option>",
+      options_for_select([ "<Denmark>", [ "USA", { :class => 'bold' } ], "Sweden" ], "USA")
+    )
+  end
+
+  def test_options_for_select_with_element_attributes_and_selection_array
+    assert_dom_equal(
+      "<option value=\"&lt;Denmark&gt;\">&lt;Denmark&gt;</option>\n<option value=\"USA\" class=\"bold\" selected=\"selected\">USA</option>\n<option value=\"Sweden\" selected=\"selected\">Sweden</option>",
+      options_for_select([ "<Denmark>", [ "USA", { :class => 'bold' } ], "Sweden" ], [ "USA", "Sweden" ])
+    )
+  end
+
+  def test_option_html_attributes_from_without_hash
+    assert_dom_equal(
+      "",
+      option_html_attributes([ 'foo', 'bar' ])
+    )
+  end
+
+  def test_option_html_attributes_with_single_element_hash
+    assert_dom_equal(
+      " class=\"fancy\"",
+      option_html_attributes([ 'foo', 'bar', { :class => 'fancy' } ])
+    )
+  end
+
+  def test_option_html_attributes_with_multiple_element_hash
+    assert_dom_equal(
+      " class=\"fancy\" onclick=\"alert('Hello World');\"",
+      option_html_attributes([ 'foo', 'bar', { :class => 'fancy', 'onclick' => "alert('Hello World');" } ])
+    )
+  end
+
+  def test_option_html_attributes_with_multiple_hashes
+    assert_dom_equal(
+      " class=\"fancy\" onclick=\"alert('Hello World');\"",
+      option_html_attributes([ 'foo', 'bar', { :class => 'fancy' }, { 'onclick' => "alert('Hello World');" } ])
+    )
+  end
+
+  def test_option_html_attributes_with_special_characters
+    assert_dom_equal(
+      " onclick=\"alert(&quot;&lt;code&gt;&quot;)\"",
+      option_html_attributes([ 'foo', 'bar', { :onclick => %(alert("<code>")) } ])
+    )
+  end
+
+  def test_grouped_collection_select
+    @post = Post.new
+    @post.origin = 'dk'
+
+    assert_dom_equal(
+      %Q{<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>\n<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk" selected="selected">Denmark</option>\n<option value="ie">Ireland</option></optgroup></select>},
+      grouped_collection_select("post", "origin", dummy_continents, :countries, :continent_name, :country_id, :country_name)
+    )
+  end
+
+  def test_grouped_collection_select_under_fields_for
+    @post = Post.new
+    @post.origin = 'dk'
+
+    output_buffer = fields_for :post, @post do |f|
+      concat f.grouped_collection_select("origin", dummy_continents, :countries, :continent_name, :country_id, :country_name)
+    end
+
+    assert_dom_equal(
+      %Q{<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>\n<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk" selected="selected">Denmark</option>\n<option value="ie">Ireland</option></optgroup></select>},
+      output_buffer
+    )
+  end
+
   private
 
     def dummy_posts
       [ Post.new("<Abe> went home", "<Abe>", "To a little house", "shh!"),
         Post.new("Babe went home", "Babe", "To a little house", "shh!"),
         Post.new("Cabe went home", "Cabe", "To a little house", "shh!") ]
+    end
+
+    def dummy_continents
+      [ Continent.new("<Africa>", [Country.new("<sa>", "<South Africa>"), Country.new("so", "Somalia")] ),
+       Continent.new("Europe", [Country.new("dk", "Denmark"), Country.new("ie", "Ireland")] ) ]
     end
 end

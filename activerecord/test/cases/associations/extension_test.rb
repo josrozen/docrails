@@ -29,6 +29,11 @@ class AssociationsExtensionsTest < ActiveRecord::TestCase
     assert_equal projects(:action_controller), developers(:david).projects_extended_by_name_and_block.find_most_recent
     assert_equal projects(:active_record), developers(:david).projects_extended_by_name_and_block.find_least_recent
   end
+  
+  def test_extension_with_scopes
+    assert_equal comments(:greetings), posts(:welcome).comments.offset(1).find_most_recent
+    assert_equal comments(:greetings), posts(:welcome).comments.not_again.find_most_recent
+  end
 
   def test_marshalling_extensions
     david = developers(:david)
@@ -46,17 +51,13 @@ class AssociationsExtensionsTest < ActiveRecord::TestCase
     assert_equal projects(:action_controller), david.projects_extended_by_name.find_most_recent
   end
 
+  def test_extension_name
+    extension = Proc.new {}
+    name = :association_name
 
-	def test_extension_name
-	  extension = Proc.new {}
-	  name = :association_name
-
-	  assert_equal 'DeveloperAssociationNameAssociationExtension', Developer.send(:create_extension_modules, name, extension, []).first.name
-	  assert_equal 'MyApplication::Business::DeveloperAssociationNameAssociationExtension',
-MyApplication::Business::Developer.send(:create_extension_modules, name, extension, []).first.name
+    assert_equal 'DeveloperAssociationNameAssociationExtension', Developer.send(:create_extension_modules, name, extension, []).first.name
+    assert_equal 'MyApplication::Business::DeveloperAssociationNameAssociationExtension', MyApplication::Business::Developer.send(:create_extension_modules, name, extension, []).first.name
     assert_equal 'MyApplication::Business::DeveloperAssociationNameAssociationExtension', MyApplication::Business::Developer.send(:create_extension_modules, name, extension, []).first.name
     assert_equal 'MyApplication::Business::DeveloperAssociationNameAssociationExtension', MyApplication::Business::Developer.send(:create_extension_modules, name, extension, []).first.name
   end
-
-
 end

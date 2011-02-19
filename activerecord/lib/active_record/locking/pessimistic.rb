@@ -1,25 +1,3 @@
-# Copyright (c) 2006 Shugo Maeda <shugo@ruby-lang.org>
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject
-# to the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR
-# ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
-# CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
 module ActiveRecord
   module Locking
     # Locking::Pessimistic provides support for row-level locking using
@@ -36,8 +14,8 @@ module ActiveRecord
     # Example:
     #   Account.transaction do
     #     # select * from accounts where name = 'shugo' limit 1 for update
-    #     shugo = Account.find(:first, :conditions => "name = 'shugo'", :lock => true)
-    #     yuko = Account.find(:first, :conditions => "name = 'yuko'", :lock => true)
+    #     shugo = Account.where("name = 'shugo'").lock(true).first
+    #     yuko = Account.where("name = 'shugo'").lock(true).first
     #     shugo.balance -= 100
     #     shugo.save!
     #     yuko.balance += 100
@@ -48,7 +26,7 @@ module ActiveRecord
     # This may be better if you don't need to lock every row. Example:
     #   Account.transaction do
     #     # select * from accounts where ...
-    #     accounts = Account.find(:all, :conditions => ...)
+    #     accounts = Account.where(...).all
     #     account1 = accounts.detect { |account| ... }
     #     account2 = accounts.detect { |account| ... }
     #     # select * from accounts where id=? for update
@@ -62,14 +40,14 @@ module ActiveRecord
     #
     # Database-specific information on row locking:
     #   MySQL: http://dev.mysql.com/doc/refman/5.1/en/innodb-locking-reads.html
-    #   PostgreSQL: http://www.postgresql.org/docs/8.1/interactive/sql-select.html#SQL-FOR-UPDATE-SHARE
+    #   PostgreSQL: http://www.postgresql.org/docs/current/interactive/sql-select.html#SQL-FOR-UPDATE-SHARE
     module Pessimistic
       # Obtain a row lock on this record. Reloads the record to obtain the requested
       # lock. Pass an SQL locking clause to append the end of the SELECT statement
       # or pass true for "FOR UPDATE" (the default, an exclusive row lock).  Returns
       # the locked record.
       def lock!(lock = true)
-        reload(:lock => lock) unless new_record?
+        reload(:lock => lock) if persisted?
         self
       end
     end

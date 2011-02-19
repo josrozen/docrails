@@ -4,12 +4,13 @@ class MemoizableTest < ActiveSupport::TestCase
   class Person
     extend ActiveSupport::Memoizable
 
-    attr_reader :name_calls, :age_calls, :is_developer_calls
+    attr_reader :name_calls, :age_calls, :is_developer_calls, :name_query_calls
 
     def initialize
       @name_calls = 0
       @age_calls = 0
       @is_developer_calls = 0
+      @name_query_calls = 0
     end
 
     def name
@@ -18,6 +19,7 @@ class MemoizableTest < ActiveSupport::TestCase
     end
 
     def name?
+      @name_query_calls += 1
       true
     end
     memoize :name?
@@ -33,6 +35,13 @@ class MemoizableTest < ActiveSupport::TestCase
     end
 
     memoize :name, :age
+
+    protected
+
+    def memoize_protected_test
+      'protected'
+    end
+    memoize :memoize_protected_test
 
     private
 
@@ -116,6 +125,13 @@ class MemoizableTest < ActiveSupport::TestCase
     end
   end
 
+  def test_memoization_flush_with_punctuation
+    assert_equal true, @person.name?
+    @person.flush_cache(:name?)
+    3.times { assert_equal true, @person.name? }
+    assert_equal 2, @person.name_query_calls
+  end
+
   def test_memoization_with_nil_value
     assert_equal nil, @person.age
     assert_equal 1, @person.age_calls
@@ -124,18 +140,7 @@ class MemoizableTest < ActiveSupport::TestCase
     assert_equal 1, @person.age_calls
   end
 
-  def test_memorized_results_are_immutable
-    # This is purely a performance enhancement that we can revisit once the rest of
-    # the code is in place. Ideally, we'd be able to do memoization in a freeze-friendly
-    # way without amc hacks
-    pending do
-      assert_equal "Josh", @person.name
-      assert_raise(ActiveSupport::FrozenObjectError) { @person.name.gsub!("Josh", "Gosh") }
-    end
-  end
-
   def test_reloadable
-    counter = @calculator.counter
     assert_equal 1, @calculator.counter
     assert_equal 2, @calculator.counter(:reload)
     assert_equal 2, @calculator.counter
@@ -237,6 +242,13 @@ class MemoizableTest < ActiveSupport::TestCase
     company.extend ActiveSupport::Memoizable
     company.memoize :name
     assert_raise(RuntimeError) { company.memoize :name }
+  end
+
+  def test_protected_method_memoization
+    person = Person.new
+
+    assert_raise(NoMethodError) { person.memoize_protected_test }
+    assert_equal "protected", person.send(:memoize_protected_test)
   end
 
   def test_private_method_memoization

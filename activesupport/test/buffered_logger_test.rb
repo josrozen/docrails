@@ -1,9 +1,12 @@
 require 'abstract_unit'
+require 'multibyte_test_helpers'
 require 'stringio'
 require 'fileutils'
 require 'active_support/buffered_logger'
 
 class BufferedLoggerTest < Test::Unit::TestCase
+  include MultibyteTestHelpers
+
   Logger = ActiveSupport::BufferedLogger
 
   def setup
@@ -69,11 +72,11 @@ class BufferedLoggerTest < Test::Unit::TestCase
 
       4.times do
         @logger.info 'wait for it..'
-        assert @output.string.empty?, @output.string
+        assert @output.string.empty?, "@output.string should be empty but it is #{@output.string}"
       end
 
       @logger.flush
-      assert !@output.string.empty?, @logger.send(:buffer).size
+      assert !@output.string.empty?, "@logger.send(:buffer).size.to_s should not be empty but it is empty"
     end
 
     define_method "test_disabling_auto_flush_with_#{disable.inspect}_should_flush_at_max_buffer_size_as_failsafe" do
@@ -82,11 +85,11 @@ class BufferedLoggerTest < Test::Unit::TestCase
 
       (Logger::MAX_BUFFER_SIZE - 1).times do
         @logger.info 'wait for it..'
-        assert @output.string.empty?, @output.string
+        assert @output.string.empty?, "@output.string should be empty but is #{@output.string}"
       end
 
       @logger.info 'there it is.'
-      assert !@output.string.empty?, @logger.send(:buffer).size
+      assert !@output.string.empty?, "@logger.send(:buffer).size.to_s should not be empty but it is empty"
     end
   end
 
@@ -102,11 +105,11 @@ class BufferedLoggerTest < Test::Unit::TestCase
 
     4.times do
       @logger.info 'wait for it..'
-      assert @output.string.empty?, @output.string
+      assert @output.string.empty?, "@output.string should be empty but it is #{@output.string}"
     end
 
     @logger.info 'there it is.'
-    assert !@output.string.empty?, @output.string
+    assert !@output.string.empty?, "@output.string should not be empty but it is empty"
   end
 
   def test_should_create_the_log_directory_if_it_doesnt_exist
@@ -145,5 +148,17 @@ class BufferedLoggerTest < Test::Unit::TestCase
     @logger.send :buffer
     @logger.expects :clear_buffer
     @logger.flush
+  end
+
+  def test_buffer_multibyte
+    @logger.auto_flushing = 2
+    @logger.info(UNICODE_STRING)
+    @logger.info(BYTE_STRING)
+    assert @output.string.include?(UNICODE_STRING)
+    byte_string = @output.string.dup
+    if byte_string.respond_to?(:force_encoding)
+      byte_string.force_encoding("ASCII-8BIT")
+    end
+    assert byte_string.include?(BYTE_STRING)
   end
 end

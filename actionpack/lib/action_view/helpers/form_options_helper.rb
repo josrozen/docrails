@@ -1,8 +1,11 @@
 require 'cgi'
 require 'erb'
 require 'action_view/helpers/form_helper'
+require 'active_support/core_ext/object/blank'
+require 'active_support/core_ext/string/output_safety'
 
 module ActionView
+  # = Action View Form Option Helpers
   module Helpers
     # Provides a number of methods for turning different kinds of containers into a set of option tags.
     # == Options
@@ -51,16 +54,16 @@ module ActionView
     #     <option value="2">Sam</option>
     #     <option value="3">Tobias</option>
     #   </select>
-    # 
-    # Like the other form helpers, +select+ can accept an <tt>:index</tt> option to manually set the ID used in the resulting output. Unlike other helpers, +select+ expects this 
+    #
+    # Like the other form helpers, +select+ can accept an <tt>:index</tt> option to manually set the ID used in the resulting output. Unlike other helpers, +select+ expects this
     # option to be in the +html_options+ parameter.
-    # 
-    # Example: 
-    # 
+    #
+    # Example:
+    #
     #   select("album[]", "genre", %w[rap rock country], {}, { :index => nil })
-    # 
+    #
     # becomes:
-    # 
+    #
     #   <select name="album[][genre]" id="album__genre">
     #     <option value="rap">rap</option>
     #     <option value="rock">rock</option>
@@ -97,7 +100,8 @@ module ActionView
     #   </select>
     #
     module FormOptionsHelper
-      include ERB::Util
+      # ERB::Util can mask some helpers like textilize. Make sure to include them.
+      include TextHelper
 
       # Create a select tag and a series of contained option tags for the provided object and method.
       # The option currently held by the object will be selected, provided that the object is available.
@@ -136,7 +140,7 @@ module ActionView
       # The <tt>:value_method</tt> and <tt>:text_method</tt> parameters are methods to be called on each member
       # of +collection+. The return values are used as the +value+ attribute and contents of each
       # <tt><option></tt> tag, respectively.
-      # 
+      #
       # Example object structure for use with this method:
       #   class Post < ActiveRecord::Base
       #     belongs_to :author
@@ -149,7 +153,7 @@ module ActionView
       #   end
       #
       # Sample usage (selecting the associated Author for an instance of Post, <tt>@post</tt>):
-      #   collection_select(:post, :author_id, Author.all, :id, :name_with_initial, {:prompt => true})
+      #   collection_select(:post, :author_id, Author.all, :id, :name_with_initial, :prompt => true)
       #
       # If <tt>@post.author_id</tt> is already <tt>1</tt>, this would return:
       #   <select name="post[author_id]">
@@ -160,6 +164,58 @@ module ActionView
       #   </select>
       def collection_select(object, method, collection, value_method, text_method, options = {}, html_options = {})
         InstanceTag.new(object, method, self, options.delete(:object)).to_collection_select_tag(collection, value_method, text_method, options, html_options)
+      end
+
+
+      # Returns <tt><select></tt>, <tt><optgroup></tt> and <tt><option></tt> tags for the collection of existing return values of
+      # +method+ for +object+'s class. The value returned from calling +method+ on the instance +object+ will
+      # be selected. If calling +method+ returns +nil+, no selection is made without including <tt>:prompt</tt>
+      # or <tt>:include_blank</tt> in the +options+ hash.
+      #
+      # Parameters:
+      # * +object+ - The instance of the class to be used for the select tag
+      # * +method+ - The attribute of +object+ corresponding to the select tag
+      # * +collection+ - An array of objects representing the <tt><optgroup></tt> tags.
+      # * +group_method+ - The name of a method which, when called on a member of +collection+, returns an
+      #   array of child objects representing the <tt><option></tt> tags.
+      # * +group_label_method+ - The name of a method which, when called on a member of +collection+, returns a
+      #   string to be used as the +label+ attribute for its <tt><optgroup></tt> tag.
+      # * +option_key_method+ - The name of a method which, when called on a child object of a member of
+      #   +collection+, returns a value to be used as the +value+ attribute for its <tt><option></tt> tag.
+      # * +option_value_method+ - The name of a method which, when called on a child object of a member of
+      #   +collection+, returns a value to be used as the contents of its <tt><option></tt> tag.
+      #
+      # Example object structure for use with this method:
+      #   class Continent < ActiveRecord::Base
+      #     has_many :countries
+      #     # attribs: id, name
+      #   end
+      #   class Country < ActiveRecord::Base
+      #     belongs_to :continent
+      #     # attribs: id, name, continent_id
+      #   end
+      #   class City < ActiveRecord::Base
+      #     belongs_to :country
+      #     # attribs: id, name, country_id
+      #   end
+      #
+      # Sample usage:
+      #   grouped_collection_select(:city, :country_id, @continents, :countries, :name, :id, :name)
+      #
+      # Possible output:
+      #   <select name="city[country_id]">
+      #     <optgroup label="Africa">
+      #       <option value="1">South Africa</option>
+      #       <option value="3">Somalia</option>
+      #     </optgroup>
+      #     <optgroup label="Europe">
+      #       <option value="7" selected="selected">Denmark</option>
+      #       <option value="2">Ireland</option>
+      #     </optgroup>
+      #   </select>
+      #
+      def grouped_collection_select(object, method, collection, group_method, group_label_method, option_key_method, option_value_method, options = {}, html_options = {})
+        InstanceTag.new(object, method, self, options.delete(:object)).to_grouped_collection_select_tag(collection, group_method, group_label_method, option_key_method, option_value_method, options, html_options)
       end
 
       # Return select and option tags for the given object and method, using
@@ -191,7 +247,7 @@ module ActionView
       #
       #   time_zone_select( "user", 'time_zone', /Australia/)
       #
-      #   time_zone_select( "user", "time_zone", ActiveSupport::Timezone.all.sort, :model => ActiveSupport::Timezone)
+      #   time_zone_select( "user", "time_zone", ActiveSupport::TimeZone.all.sort, :model => ActiveSupport::TimeZone)
       def time_zone_select(object, method, priority_zones = nil, options = {}, html_options = {})
         InstanceTag.new(object, method, self,  options.delete(:object)).to_time_zone_select_tag(priority_zones, options, html_options)
       end
@@ -215,6 +271,15 @@ module ActionView
       #   options_for_select([ "VISA", "MasterCard", "Discover" ], ["VISA", "Discover"])
       #     <option selected="selected">VISA</option>\n<option>MasterCard</option>\n<option selected="selected">Discover</option>
       #
+      # You can optionally provide html attributes as the last element of the array.
+      #
+      # Examples:
+      #   options_for_select([ "Denmark", ["USA", {:class=>'bold'}], "Sweden" ], ["USA", "Sweden"])
+      #     <option value="Denmark">Denmark</option>\n<option value="USA" class="bold" selected="selected">USA</option>\n<option value="Sweden" selected="selected">Sweden</option>
+      #
+      #   options_for_select([["Dollar", "$", {:class=>"bold"}], ["Kroner", "DKK", {:onclick => "alert('HI');"}]])
+      #     <option value="$" class="bold">Dollar</option>\n<option value="DKK" onclick="alert('HI');">Kroner</option>
+      #
       # If you wish to specify disabled option tags, set +selected+ to be a hash, with <tt>:disabled</tt> being either a value
       # or array of values to be disabled. In this case, you can use <tt>:selected</tt> to specify selected option tags.
       #
@@ -230,17 +295,20 @@ module ActionView
       #
       # NOTE: Only the option tags are returned, you have to wrap this call in a regular HTML select tag.
       def options_for_select(container, selected = nil)
-        container = container.to_a if Hash === container
-        selected, disabled = extract_selected_and_disabled(selected)
+        return container if String === container
 
-        options_for_select = container.inject([]) do |options, element|
-          text, value = option_text_and_value(element)
-          selected_attribute = ' selected="selected"' if option_value_selected?(value, selected)
-          disabled_attribute = ' disabled="disabled"' if disabled && option_value_selected?(value, disabled)
-          options << %(<option value="#{html_escape(value.to_s)}"#{selected_attribute}#{disabled_attribute}>#{html_escape(text.to_s)}</option>)
+        selected, disabled = extract_selected_and_disabled(selected).map do | r |
+           Array.wrap(r).map(&:to_s)
         end
 
-        options_for_select.join("\n")
+        container.map do |element|
+          html_attributes = option_html_attributes(element)
+          text, value = option_text_and_value(element).map(&:to_s)
+          selected_attribute = ' selected="selected"' if option_value_selected?(value, selected)
+          disabled_attribute = ' disabled="disabled"' if disabled && option_value_selected?(value, disabled)
+          %(<option value="#{ERB::Util.html_escape(value)}"#{selected_attribute}#{disabled_attribute}#{html_attributes}>#{ERB::Util.html_escape(text)}</option>)
+        end.join("\n").html_safe
+
       end
 
       # Returns a string of option tags that have been compiled by iterating over the +collection+ and assigning the
@@ -326,12 +394,12 @@ module ActionView
       # <b>Note:</b> Only the <tt><optgroup></tt> and <tt><option></tt> tags are returned, so you still have to
       # wrap the output in an appropriate <tt><select></tt> tag.
       def option_groups_from_collection_for_select(collection, group_method, group_label_method, option_key_method, option_value_method, selected_key = nil)
-        collection.inject("") do |options_for_select, group|
+        collection.map do |group|
           group_label_string = eval("group.#{group_label_method}")
-          options_for_select += "<optgroup label=\"#{html_escape(group_label_string)}\">"
-          options_for_select += options_from_collection_for_select(eval("group.#{group_method}"), option_key_method, option_value_method, selected_key)
-          options_for_select += '</optgroup>'
-        end
+          "<optgroup label=\"#{ERB::Util.html_escape(group_label_string)}\">" +
+            options_from_collection_for_select(eval("group.#{group_method}"), option_key_method, option_value_method, selected_key) +
+            '</optgroup>'
+        end.join.html_safe
       end
 
       # Returns a string of <tt><option></tt> tags, like <tt>options_for_select</tt>, but
@@ -345,8 +413,8 @@ module ActionView
       # * +selected_key+ - A value equal to the +value+ attribute for one of the <tt><option></tt> tags,
       #   which will have the +selected+ attribute set. Note: It is possible for this value to match multiple options
       #   as you might have the same option in multiple groups.  Each will then get <tt>selected="selected"</tt>.
-      # * +prompt+ - set to true or a prompt string. When the select element doesn’t have a value yet, this
-      #   prepends an option with a generic prompt — "Please select" — or the given prompt string.
+      # * +prompt+ - set to true or a prompt string. When the select element doesn't have a value yet, this
+      #   prepends an option with a generic prompt - "Please select" - or the given prompt string.
       #
       # Sample usage (Array):
       #   grouped_options = [
@@ -379,7 +447,7 @@ module ActionView
       # wrap the output in an appropriate <tt><select></tt> tag.
       def grouped_options_for_select(grouped_options, selected_key = nil, prompt = nil)
         body = ''
-        body << content_tag(:option, prompt, :value => "") if prompt
+        body << content_tag(:option, prompt, { :value => "" }, true) if prompt
 
         grouped_options = grouped_options.sort if grouped_options.is_a?(Hash)
 
@@ -387,7 +455,7 @@ module ActionView
           body << content_tag(:optgroup, options_for_select(group[1], selected_key), :label => group[0])
         end
 
-        body
+        body.html_safe
       end
 
       # Returns a string of option tags for pretty much any time zone in the
@@ -425,13 +493,26 @@ module ActionView
         end
 
         zone_options += options_for_select(convert_zones[zones], selected)
-        zone_options
+        zone_options.html_safe
       end
 
       private
+        def option_html_attributes(element)
+          return "" unless Array === element
+          html_attributes = []
+          element.select { |e| Hash === e }.reduce({}, :merge).each do |k, v|
+            html_attributes << " #{k}=\"#{ERB::Util.html_escape(v.to_s)}\""
+          end
+          html_attributes.join
+        end
+
         def option_text_and_value(option)
           # Options are [text, value] pairs or strings used for both.
-          if !option.is_a?(String) and option.respond_to?(:first) and option.respond_to?(:last)
+          case
+          when Array === option
+            option = option.reject { |e| Hash === e }
+            [option.first, option.last]
+          when !option.is_a?(String) && option.respond_to?(:first) && option.respond_to?(:last)
             [option.first, option.last]
           else
             [option, option]
@@ -447,10 +528,12 @@ module ActionView
         end
 
         def extract_selected_and_disabled(selected)
-          if selected.is_a?(Hash)
-            [selected[:selected], selected[:disabled]]
+          if selected.is_a?(Proc)
+            [ selected, nil ]
           else
-            [selected, nil]
+            selected = Array.wrap(selected)
+            options = selected.extract_options!.symbolize_keys
+            [ options.include?(:selected) ? options[:selected] : selected, options[:disabled] ]
           end
         end
 
@@ -488,6 +571,15 @@ module ActionView
         )
       end
 
+      def to_grouped_collection_select_tag(collection, group_method, group_label_method, option_key_method, option_value_method, options, html_options)
+        html_options = html_options.stringify_keys
+        add_default_name_and_id(html_options)
+        value = value(object)
+        content_tag(
+          "select", add_options(option_groups_from_collection_for_select(collection, group_method, group_label_method, option_key_method, option_value_method, value), options, value), html_options
+        )
+      end
+
       def to_time_zone_select_tag(priority_zones, options, html_options)
         html_options = html_options.stringify_keys
         add_default_name_and_id(html_options)
@@ -503,13 +595,13 @@ module ActionView
       private
         def add_options(option_tags, options, value = nil)
           if options[:include_blank]
-            option_tags = "<option value=\"\">#{options[:include_blank] if options[:include_blank].kind_of?(String)}</option>\n" + option_tags
+            option_tags = "<option value=\"\">#{ERB::Util.html_escape(options[:include_blank]) if options[:include_blank].kind_of?(String)}</option>\n" + option_tags
           end
           if value.blank? && options[:prompt]
-            ("<option value=\"\">#{options[:prompt].kind_of?(String) ? options[:prompt] : 'Please select'}</option>\n") + option_tags
-          else
-            option_tags
+            prompt = options[:prompt].kind_of?(String) ? options[:prompt] : I18n.translate('helpers.select.prompt', :default => 'Please select')
+            option_tags = "<option value=\"\">#{ERB::Util.html_escape(prompt)}</option>\n" + option_tags
           end
+          option_tags.html_safe
         end
     end
 
@@ -520,6 +612,10 @@ module ActionView
 
       def collection_select(method, collection, value_method, text_method, options = {}, html_options = {})
         @template.collection_select(@object_name, method, collection, value_method, text_method, objectify_options(options), @default_options.merge(html_options))
+      end
+
+      def grouped_collection_select(method, collection, group_method, group_label_method, option_key_method, option_value_method, options = {}, html_options = {})
+        @template.grouped_collection_select(@object_name, method, collection, group_method, group_label_method, option_key_method, option_value_method, objectify_options(options), @default_options.merge(html_options))
       end
 
       def time_zone_select(method, priority_zones = nil, options = {}, html_options = {})

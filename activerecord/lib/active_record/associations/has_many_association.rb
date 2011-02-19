@@ -1,25 +1,24 @@
 module ActiveRecord
+  # = Active Record Has Many Association
   module Associations
     # This is the proxy that handles a has many association.
     #
     # If the association has a <tt>:through</tt> option further specialization
     # is provided by its child HasManyThroughAssociation.
-    class HasManyAssociation < AssociationCollection #:nodoc:
-      protected
-        def owner_quoted_id
-          if @reflection.options[:primary_key]
-            quote_value(@owner.send(@reflection.options[:primary_key]))
-          else
-            @owner.quoted_id
-          end
-        end
+    class HasManyAssociation < CollectionAssociation #:nodoc:
+      def insert_record(record, validate = true)
+        set_owner_attributes(record)
+        record.save(:validate => validate)
+      end
+
+      private
 
         # Returns the number of records in this collection.
         #
         # If the association has a counter cache it gets that value. Otherwise
         # it will attempt to do a count via SQL, bounded to <tt>:limit</tt> if
         # there's one.  Some configuration options like :group make it impossible
-        # to do a SQL count, in those cases the array count will be used.
+        # to do an SQL count, in those cases the array count will be used.
         #
         # That does not depend on whether the collection has already been loaded
         # or not. The +size+ method is the one that takes the loaded flag into
@@ -30,92 +29,72 @@ module ActiveRecord
         def count_records
           count = if has_cached_counter?
             @owner.send(:read_attribute, cached_counter_attribute_name)
-          elsif @reflection.options[:counter_sql]
-            @reflection.klass.count_by_sql(@counter_sql)
+          elsif @reflection.options[:counter_sql] || @reflection.options[:finder_sql]
+            @reflection.klass.count_by_sql(custom_counter_sql)
           else
-            @reflection.klass.count(:conditions => @counter_sql, :include => @reflection.options[:include])
+            scoped.count
           end
 
           # If there's nothing in the database and @target has no new records
           # we are certain the current target is an empty array. This is a
           # documented side-effect of the method that may avoid an extra SELECT.
-          @target ||= [] and loaded if count == 0
-          
-          if @reflection.options[:limit]
-            count = [ @reflection.options[:limit], count ].min
+          @target ||= [] and loaded! if count == 0
+
+          [@reflection.options[:limit], count].compact.min
+        end
+
+        def has_cached_counter?(reflection = @reflection)
+          @owner.attribute_present?(cached_counter_attribute_name(reflection))
+        end
+
+        def cached_counter_attribute_name(reflection = @reflection)
+          "#{reflection.name}_count"
+        end
+
+        def update_counter(difference, reflection = @reflection)
+          if has_cached_counter?(reflection)
+            counter = cached_counter_attribute_name(reflection)
+            @owner.class.update_counters(@owner.id, counter => difference)
+            @owner[counter] += difference
+            @owner.changed_attributes.delete(counter) # eww
           end
-          
-          return count
         end
 
-        def has_cached_counter?
-          @owner.attribute_present?(cached_counter_attribute_name)
-        end
-
-        def cached_counter_attribute_name
-          "#{@reflection.name}_count"
-        end
-
-        def insert_record(record, force = false, validate = true)
-          set_belongs_to_association_for(record)
-          force ? record.save! : record.save(validate)
+        # This shit is nasty. We need to avoid the following situation:
+        #
+        #   * An associated record is deleted via record.destroy
+        #   * Hence the callbacks run, and they find a belongs_to on the record with a
+        #     :counter_cache options which points back at our @owner. So they update the
+        #     counter cache.
+        #   * In which case, we must make sure to *not* update the counter cache, or else
+        #     it will be decremented twice.
+        #
+        # Hence this method.
+        def inverse_updates_counter_cache?(reflection = @reflection)
+          counter_name = cached_counter_attribute_name(reflection)
+          reflection.klass.reflect_on_all_associations(:belongs_to).any? { |inverse_reflection|
+            inverse_reflection.counter_cache_column == counter_name
+          }
         end
 
         # Deletes the records according to the <tt>:dependent</tt> option.
-        def delete_records(records)
-          case @reflection.options[:dependent]
-            when :destroy
-              records.each { |r| r.destroy }
-            when :delete_all
-              @reflection.klass.delete(records.map { |record| record.id })
-            else
-              ids = quoted_record_ids(records)
-              @reflection.klass.update_all(
-                "#{@reflection.primary_key_name} = NULL", 
-                "#{@reflection.primary_key_name} = #{owner_quoted_id} AND #{@reflection.klass.primary_key} IN (#{ids})"
-              )
-          end
-        end
-
-        def target_obsolete?
-          false
-        end
-
-        def construct_sql
-          case
-            when @reflection.options[:finder_sql]
-              @finder_sql = interpolate_sql(@reflection.options[:finder_sql])
-
-            when @reflection.options[:as]
-              @finder_sql = 
-                "#{@reflection.quoted_table_name}.#{@reflection.options[:as]}_id = #{owner_quoted_id} AND " +
-                "#{@reflection.quoted_table_name}.#{@reflection.options[:as]}_type = #{@owner.class.quote_value(@owner.class.base_class.name.to_s)}"
-              @finder_sql << " AND (#{conditions})" if conditions
-            
-            else
-              @finder_sql = "#{@reflection.quoted_table_name}.#{@reflection.primary_key_name} = #{owner_quoted_id}"
-              @finder_sql << " AND (#{conditions})" if conditions
-          end
-
-          if @reflection.options[:counter_sql]
-            @counter_sql = interpolate_sql(@reflection.options[:counter_sql])
-          elsif @reflection.options[:finder_sql]
-            # replace the SELECT clause with COUNT(*), preserving any hints within /* ... */
-            @reflection.options[:counter_sql] = @reflection.options[:finder_sql].sub(/SELECT (\/\*.*?\*\/ )?(.*)\bFROM\b/im) { "SELECT #{$1}COUNT(*) FROM" }
-            @counter_sql = interpolate_sql(@reflection.options[:counter_sql])
+        def delete_records(records, method)
+          if method == :destroy
+            records.each { |r| r.destroy }
+            update_counter(-records.length) unless inverse_updates_counter_cache?
           else
-            @counter_sql = @finder_sql
+            keys  = records.map { |r| r[@reflection.association_primary_key] }
+            scope = scoped.where(@reflection.association_primary_key => keys)
+
+            if method == :delete_all
+              update_counter(-scope.delete_all)
+            else
+              update_counter(-scope.update_all(@reflection.foreign_key => nil))
+            end
           end
         end
 
-        def construct_scope
-          create_scoping = {}
-          set_belongs_to_association_for(create_scoping)
-          {
-            :find => { :conditions => @finder_sql, :readonly => false, :order => @reflection.options[:order], :limit => @reflection.options[:limit], :include => @reflection.options[:include]},
-            :create => create_scoping
-          }
-        end
+        alias creation_attributes construct_owner_attributes
     end
   end
 end

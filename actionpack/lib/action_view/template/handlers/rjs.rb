@@ -1,12 +1,12 @@
 module ActionView
-  module TemplateHandlers
-    class RJS < TemplateHandler
-      include Compilable
+  module Template::Handlers
+    class RJS
+      # Default format used by RJS.
+      class_attribute :default_format
+      self.default_format = Mime::JS
 
-      def compile(template)
-        "@formats = [:html];" +
-        "controller.response.content_type ||= Mime::JS;" +
-          "update_page do |page|;#{template.source}\nend"
+      def call(template)
+        "update_page do |page|;#{template.source}\nend"
       end
     end
   end

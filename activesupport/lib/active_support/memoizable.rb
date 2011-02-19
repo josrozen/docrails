@@ -1,19 +1,7 @@
-require 'active_support/core_ext/object/metaclass'
+require 'active_support/core_ext/kernel/singleton_class'
+require 'active_support/core_ext/module/aliasing'
 
 module ActiveSupport
-  module SafelyMemoizable
-    def safely_memoize(*symbols)
-      symbols.each do |symbol|
-        class_eval <<-RUBY, __FILE__, __LINE__ + 1
-          def #{symbol}(*args)
-            memoized = @_memoized_#{symbol} || ::ActiveSupport::ConcurrentHash.new
-            memoized[args] ||= memoized_#{symbol}(*args)
-          end
-        RUBY
-      end
-    end
-  end
-  
   module Memoizable
     def self.memoized_ivar_for(symbol)
       "@_memoized_#{symbol.to_s.sub(/\?\Z/, '_query').sub(/!\Z/, '_bang')}".to_sym
@@ -56,10 +44,10 @@ module ActiveSupport
         end
       end
 
-      def flush_cache(*syms, &block)
+      def flush_cache(*syms)
         syms.each do |sym|
-          methods.each do |m|
-            if m.to_s =~ /^_unmemoized_(#{sym})/
+          (methods + private_methods + protected_methods).each do |m|
+            if m.to_s =~ /^_unmemoized_(#{sym.to_s.gsub(/\?\Z/, '\?')})/
               ivar = ActiveSupport::Memoizable.memoized_ivar_for($1)
               instance_variable_get(ivar).clear if instance_variable_defined?(ivar)
             end
@@ -107,6 +95,8 @@ module ActiveSupport
                                                                                    #
           if private_method_defined?(#{original_method.inspect})                   # if private_method_defined?(:_unmemoized_mime_type)
             private #{symbol.inspect}                                              #   private :mime_type
+          elsif protected_method_defined?(#{original_method.inspect})              # elsif protected_method_defined?(:_unmemoized_mime_type)
+            protected #{symbol.inspect}                                            #   protected :mime_type
           end                                                                      # end
         EOS
       end

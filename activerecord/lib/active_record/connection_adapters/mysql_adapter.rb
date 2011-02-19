@@ -1,45 +1,28 @@
 require 'active_record/connection_adapters/abstract_adapter'
+require 'active_support/core_ext/kernel/requires'
+require 'active_support/core_ext/object/blank'
 require 'set'
 
-module MysqlCompat #:nodoc:
-  # add all_hashes method to standard mysql-c bindings or pure ruby version
-  def self.define_all_hashes_method!
-    raise 'Mysql not loaded' unless defined?(::Mysql)
+begin
+  require 'mysql'
+rescue LoadError
+  raise "!!! Missing the mysql gem. Add it to your Gemfile: gem 'mysql'"
+end
 
-    target = defined?(Mysql::Result) ? Mysql::Result : MysqlRes
-    return if target.instance_methods.include?('all_hashes')
+unless defined?(Mysql::Result) && Mysql::Result.method_defined?(:each_hash)
+  raise "!!! Outdated mysql gem. Upgrade to 2.8.1 or later. In your Gemfile: gem 'mysql', '2.8.1'. Or use gem 'mysql2'"
+end
 
-    # Ruby driver has a version string and returns null values in each_hash
-    # C driver >= 2.7 returns null values in each_hash
-    if Mysql.const_defined?(:VERSION) && (Mysql::VERSION.is_a?(String) || Mysql::VERSION >= 20700)
-      target.class_eval <<-'end_eval'
-      def all_hashes                     # def all_hashes
-        rows = []                        #   rows = []
-        each_hash { |row| rows << row }  #   each_hash { |row| rows << row }
-        rows                             #   rows
-      end                                # end
-      end_eval
-
-    # adapters before 2.7 don't have a version constant
-    # and don't return null values in each_hash
-    else
-      target.class_eval <<-'end_eval'
-      def all_hashes                                            # def all_hashes
-        rows = []                                               #   rows = []
-        all_fields = fetch_fields.inject({}) { |fields, f|      #   all_fields = fetch_fields.inject({}) { |fields, f|
-          fields[f.name] = nil; fields                          #     fields[f.name] = nil; fields
-        }                                                       #   }
-        each_hash { |row| rows << all_fields.dup.update(row) }  #   each_hash { |row| rows << all_fields.dup.update(row) }
-        rows                                                    #   rows
-      end                                                       # end
-      end_eval
-    end
-
-    unless target.instance_methods.include?('all_hashes') ||
-           target.instance_methods.include?(:all_hashes)
-      raise "Failed to defined #{target.name}#all_hashes method. Mysql::VERSION = #{Mysql::VERSION.inspect}"
+class Mysql
+  class Time
+    ###
+    # This monkey patch is for test_additional_columns_from_join_table
+    def to_date
+      Date.new(year, month, day)
     end
   end
+  class Stmt; include Enumerable end
+  class Result; include Enumerable end
 end
 
 module ActiveRecord
@@ -52,35 +35,46 @@ module ActiveRecord
       socket   = config[:socket]
       username = config[:username] ? config[:username].to_s : 'root'
       password = config[:password].to_s
-
-      if config.has_key?(:database)
-        database = config[:database]
-      else
-        raise ArgumentError, "No database specified. Missing argument: database."
-      end
-
-      # Require the MySQL driver and define Mysql::Result.all_hashes
-      unless defined? Mysql
-        begin
-          require_library_or_gem('mysql')
-        rescue LoadError
-          $stderr.puts '!!! The bundled mysql.rb driver has been removed from Rails 2.2. Please install the mysql gem and try again: gem install mysql.'
-          raise
-        end
-      end
-      MysqlCompat.define_all_hashes_method!
+      database = config[:database]
 
       mysql = Mysql.init
       mysql.ssl_set(config[:sslkey], config[:sslcert], config[:sslca], config[:sslcapath], config[:sslcipher]) if config[:sslca] || config[:sslkey]
 
-      ConnectionAdapters::MysqlAdapter.new(mysql, logger, [host, username, password, database, port, socket], config)
+      default_flags = Mysql.const_defined?(:CLIENT_MULTI_RESULTS) ? Mysql::CLIENT_MULTI_RESULTS : 0
+      default_flags |= Mysql::CLIENT_FOUND_ROWS if Mysql.const_defined?(:CLIENT_FOUND_ROWS)
+      options = [host, username, password, database, port, socket, default_flags]
+      ConnectionAdapters::MysqlAdapter.new(mysql, logger, options, config)
     end
   end
 
   module ConnectionAdapters
     class MysqlColumn < Column #:nodoc:
+      class << self
+        def string_to_time(value)
+          return super unless Mysql::Time === value
+          new_time(
+            value.year,
+            value.month,
+            value.day,
+            value.hour,
+            value.minute,
+            value.second,
+            value.second_part)
+        end
+
+        def string_to_dummy_time(v)
+          return super unless Mysql::Time === v
+          new_time(2000, 01, 01, v.hour, v.minute, v.second, v.second_part)
+        end
+
+        def string_to_date(v)
+          return super unless Mysql::Time === v
+          new_date(v.year, v.month, v.day)
+        end
+      end
+
       def extract_default(default)
-        if type == :binary || type == :text
+        if sql_type =~ /blob/i || type == :text
           if default.blank?
             return null ? nil : ''
           else
@@ -94,7 +88,7 @@ module ActiveRecord
       end
 
       def has_default?
-        return false if type == :binary || type == :text #mysql forbids defaults on blob and text columns
+        return false if sql_type =~ /blob/i || type == :text #mysql forbids defaults on blob and text columns
         super
       end
 
@@ -166,13 +160,13 @@ module ActiveRecord
       # By default, the MysqlAdapter will consider all columns of type <tt>tinyint(1)</tt>
       # as boolean. If you wish to disable this emulation (which was the default
       # behavior in versions 0.13.1 and earlier) you can add the following line
-      # to your environment.rb file:
+      # to your application.rb file:
       #
       #   ActiveRecord::ConnectionAdapters::MysqlAdapter.emulate_booleans = false
       cattr_accessor :emulate_booleans
       self.emulate_booleans = true
 
-      ADAPTER_NAME = 'MySQL'.freeze
+      ADAPTER_NAME = 'MySQL'
 
       LOST_CONNECTION_ERROR_MESSAGES = [
         "Server shutdown in progress",
@@ -180,10 +174,10 @@ module ActiveRecord
         "Lost connection to MySQL server during query",
         "MySQL server has gone away" ]
 
-      QUOTED_TRUE, QUOTED_FALSE = '1'.freeze, '0'.freeze
+      QUOTED_TRUE, QUOTED_FALSE = '1', '0'
 
       NATIVE_DATABASE_TYPES = {
-        :primary_key => "int(11) DEFAULT NULL auto_increment PRIMARY KEY".freeze,
+        :primary_key => "int(11) DEFAULT NULL auto_increment PRIMARY KEY",
         :string      => { :name => "varchar", :limit => 255 },
         :text        => { :name => "text" },
         :integer     => { :name => "int", :limit => 4 },
@@ -201,6 +195,7 @@ module ActiveRecord
         super(connection, logger)
         @connection_options, @config = connection_options, config
         @quoted_column_names, @quoted_table_names = {}, {}
+        @statements = {}
         connect
       end
 
@@ -208,10 +203,24 @@ module ActiveRecord
         ADAPTER_NAME
       end
 
+      def supports_bulk_alter? #:nodoc:
+        true
+      end
+
+      # Returns +true+ when the connection adapter supports prepared statement
+      # caching, otherwise returns +false+
+      def supports_statement_cache?
+        true
+      end
+
       def supports_migrations? #:nodoc:
         true
       end
-      
+
+      def supports_primary_key? #:nodoc:
+        true
+      end
+
       def supports_savepoints? #:nodoc:
         true
       end
@@ -256,7 +265,7 @@ module ActiveRecord
 
       # REFERENTIAL INTEGRITY ====================================
 
-      def disable_referential_integrity(&block) #:nodoc:
+      def disable_referential_integrity #:nodoc:
         old = select_value("SELECT @@FOREIGN_KEY_CHECKS")
 
         begin
@@ -288,6 +297,7 @@ module ActiveRecord
 
       def reconnect!
         disconnect!
+        clear_cache!
         connect
       end
 
@@ -308,16 +318,76 @@ module ActiveRecord
 
       def select_rows(sql, name = nil)
         @connection.query_with_result = true
-        result = execute(sql, name)
-        rows = []
-        result.each { |row| rows << row }
-        result.free
+        rows = exec_without_stmt(sql, name).rows
+        @connection.more_results && @connection.next_result    # invoking stored procedures with CLIENT_MULTI_RESULTS requires this to tidy up else connection will be dropped
         rows
       end
 
-      # Executes a SQL query and returns a MySQL::Result object. Note that you have to free the Result object after you're done using it.
+      def clear_cache!
+        @statements.values.each do |cache|
+          cache[:stmt].close
+        end
+        @statements.clear
+      end
+
+      def exec_query(sql, name = 'SQL', binds = [])
+        log(sql, name, binds) do
+          result = nil
+
+          cache = {}
+          if binds.empty?
+            stmt = @connection.prepare(sql)
+          else
+            cache = @statements[sql] ||= {
+              :stmt => @connection.prepare(sql)
+            }
+            stmt = cache[:stmt]
+          end
+
+          stmt.execute(*binds.map { |col, val|
+            col ? col.type_cast(val) : val
+          })
+          if metadata = stmt.result_metadata
+            cols = cache[:cols] ||= metadata.fetch_fields.map { |field|
+              field.name
+            }
+
+            metadata.free
+            result = ActiveRecord::Result.new(cols, stmt.to_a)
+          end
+
+          stmt.free_result
+          stmt.close if binds.empty?
+
+          result
+        end
+      end
+
+      def exec_without_stmt(sql, name = 'SQL') # :nodoc:
+        # Some queries, like SHOW CREATE TABLE don't work through the prepared
+        # statement API.  For those queries, we need to use this method. :'(
+        log(sql, name) do
+          result = @connection.query(sql)
+          cols = []
+          rows = []
+
+          if result
+            cols = result.fetch_fields.map { |field| field.name }
+            rows = result.to_a
+            result.free
+          end
+          ActiveRecord::Result.new(cols, rows)
+        end
+      end
+
+      # Executes an SQL query and returns a MySQL::Result object. Note that you have to free
+      # the Result object after you're done using it.
       def execute(sql, name = nil) #:nodoc:
-        log(sql, name) { @connection.query(sql) }
+        if name == :skip_logging
+          @connection.query(sql)
+        else
+          log(sql, name) { @connection.query(sql) }
+        end
       rescue ActiveRecord::StatementInvalid => exception
         if exception.message.split(":").first =~ /Packets out of order/
           raise ActiveRecord::StatementInvalid, "'Packets out of order' error was received from the database. Please update your mysql bindings (gem install mysql) and read http://dev.mysql.com/doc/mysql/en/password-hashing.html for more information.  If you're on Windows, use the Instant Rails installer to get the updated mysql bindings."
@@ -330,6 +400,7 @@ module ActiveRecord
         super sql, name
         id_value || @connection.insert_id
       end
+      alias :create :insert_sql
 
       def update_sql(sql, name = nil) #:nodoc:
         super
@@ -337,8 +408,8 @@ module ActiveRecord
       end
 
       def begin_db_transaction #:nodoc:
-        execute "BEGIN"
-      rescue Exception
+        exec_without_stmt "BEGIN"
+      rescue Mysql::Error
         # Transactions aren't supported
       end
 
@@ -367,16 +438,17 @@ module ActiveRecord
       end
 
       def add_limit_offset!(sql, options) #:nodoc:
-        if limit = options[:limit]
-          limit = sanitize_limit(limit)
-          unless offset = options[:offset]
-            sql << " LIMIT #{limit}"
-          else
-            sql << " LIMIT #{offset.to_i}, #{limit}"
-          end
+        limit, offset = options[:limit], options[:offset]
+        if limit && offset
+          sql << " LIMIT #{offset.to_i}, #{sanitize_limit(limit)}"
+        elsif limit
+          sql << " LIMIT #{sanitize_limit(limit)}"
+        elsif offset
+          sql << " OFFSET #{offset.to_i}"
         end
+        sql
       end
-
+      deprecate :add_limit_offset!
 
       # SCHEMA STATEMENTS ========================================
 
@@ -387,10 +459,11 @@ module ActiveRecord
           sql = "SHOW TABLES"
         end
 
-        select_all(sql).inject("") do |structure, table|
+        select_all(sql).map do |table|
           table.delete('Table_type')
-          structure += select_one("SHOW CREATE TABLE #{quote_table_name(table.to_a.first.last)}")["Create Table"] + ";\n\n"
-        end
+          sql = "SHOW CREATE TABLE #{quote_table_name(table.to_a.first.last)}"
+          exec_without_stmt(sql).first['Create Table'] + ";\n\n"
+        end.join("")
       end
 
       def recreate_database(name, options = {}) #:nodoc:
@@ -451,10 +524,11 @@ module ActiveRecord
           if current_index != row[2]
             next if row[2] == "PRIMARY" # skip the primary key
             current_index = row[2]
-            indexes << IndexDefinition.new(row[0], row[2], row[1] == "0", [])
+            indexes << IndexDefinition.new(row[0], row[2], row[1] == "0", [], [])
           end
 
           indexes.last.columns << row[4]
+          indexes.last.lengths << row[7]
         end
         result.free
         indexes
@@ -463,7 +537,7 @@ module ActiveRecord
       def columns(table_name, name = nil)#:nodoc:
         sql = "SHOW FIELDS FROM #{quote_table_name(table_name)}"
         columns = []
-        result = execute(sql, name)
+        result = execute(sql)
         result.each { |field| columns << MysqlColumn.new(field[0], field[4], field[1], field[2] == "YES") }
         result.free
         columns
@@ -475,6 +549,25 @@ module ActiveRecord
 
       def rename_table(table_name, new_name)
         execute "RENAME TABLE #{quote_table_name(table_name)} TO #{quote_table_name(new_name)}"
+      end
+
+      def bulk_change_table(table_name, operations) #:nodoc:
+        sqls = operations.map do |command, args|
+          table, arguments = args.shift, args
+          method = :"#{command}_sql"
+
+          if respond_to?(method)
+            send(method, table, *arguments)
+          else
+            raise "Unknown method called : #{method}(#{arguments.inspect})"
+          end
+        end.flatten.join(", ")
+
+        execute("ALTER TABLE #{quote_table_name(table_name)} #{sqls}")
+      end
+
+      def add_column(table_name, column_name, type, options = {})
+        execute("ALTER TABLE #{quote_table_name(table_name)} #{add_column_sql(table_name, column_name, type, options)}")
       end
 
       def change_column_default(table_name, column_name, default) #:nodoc:
@@ -493,33 +586,11 @@ module ActiveRecord
       end
 
       def change_column(table_name, column_name, type, options = {}) #:nodoc:
-        column = column_for(table_name, column_name)
-
-        unless options_include_default?(options)
-          options[:default] = column.default
-        end
-
-        unless options.has_key?(:null)
-          options[:null] = column.null
-        end
-
-        change_column_sql = "ALTER TABLE #{quote_table_name(table_name)} CHANGE #{quote_column_name(column_name)} #{quote_column_name(column_name)} #{type_to_sql(type, options[:limit], options[:precision], options[:scale])}"
-        add_column_options!(change_column_sql, options)
-        execute(change_column_sql)
+        execute("ALTER TABLE #{quote_table_name(table_name)} #{change_column_sql(table_name, column_name, type, options)}")
       end
 
       def rename_column(table_name, column_name, new_column_name) #:nodoc:
-        options = {}
-        if column = columns(table_name).find { |c| c.name == column_name.to_s }
-          options[:default] = column.default
-          options[:null] = column.null
-        else
-          raise ActiveRecordError, "No such column: #{table_name}.#{column_name}"
-        end
-        current_type = select_one("SHOW COLUMNS FROM #{quote_table_name(table_name)} LIKE '#{column_name}'")["Type"]
-        rename_column_sql = "ALTER TABLE #{quote_table_name(table_name)} CHANGE #{quote_column_name(column_name)} #{quote_column_name(new_column_name)} #{current_type}"
-        add_column_options!(rename_column_sql, options)
-        execute(rename_column_sql)
+        execute("ALTER TABLE #{quote_table_name(table_name)} #{rename_column_sql(table_name, column_name, new_column_name)}")
       end
 
       # Maps logical Rails types to MySQL-specific data types.
@@ -536,6 +607,13 @@ module ActiveRecord
         end
       end
 
+      def add_column_position!(sql, options)
+        if options[:first]
+          sql << " FIRST"
+        elsif options[:after]
+          sql << " AFTER #{quote_column_name(options[:after])}"
+        end
+      end
 
       # SHOW VARIABLES LIKE 'name'
       def show_variable(name)
@@ -554,6 +632,12 @@ module ActiveRecord
         keys.length == 1 ? [keys.first, nil] : nil
       end
 
+      # Returns just a table's primary key
+      def primary_key(table)
+        pk_and_sequence = pk_and_sequence_for(table)
+        pk_and_sequence && pk_and_sequence.first
+      end
+
       def case_sensitive_equality_operator
         "= BINARY"
       end
@@ -561,6 +645,96 @@ module ActiveRecord
       def limited_update_conditions(where_sql, quoted_table_name, quoted_primary_key)
         where_sql
       end
+
+      protected
+        def quoted_columns_for_index(column_names, options = {})
+          length = options[:length] if options.is_a?(Hash)
+
+          quoted_column_names = case length
+          when Hash
+            column_names.map {|name| length[name] ? "#{quote_column_name(name)}(#{length[name]})" : quote_column_name(name) }
+          when Fixnum
+            column_names.map {|name| "#{quote_column_name(name)}(#{length})"}
+          else
+            column_names.map {|name| quote_column_name(name) }
+          end
+        end
+
+        def translate_exception(exception, message)
+          return super unless exception.respond_to?(:errno)
+
+          case exception.errno
+          when 1062
+            RecordNotUnique.new(message, exception)
+          when 1452
+            InvalidForeignKey.new(message, exception)
+          else
+            super
+          end
+        end
+
+        def add_column_sql(table_name, column_name, type, options = {})
+          add_column_sql = "ADD #{quote_column_name(column_name)} #{type_to_sql(type, options[:limit], options[:precision], options[:scale])}"
+          add_column_options!(add_column_sql, options)
+          add_column_position!(add_column_sql, options)
+          add_column_sql
+        end
+
+        def remove_column_sql(table_name, *column_names)
+          columns_for_remove(table_name, *column_names).map {|column_name| "DROP #{column_name}" }
+        end
+        alias :remove_columns_sql :remove_column
+
+        def change_column_sql(table_name, column_name, type, options = {})
+          column = column_for(table_name, column_name)
+
+          unless options_include_default?(options)
+            options[:default] = column.default
+          end
+
+          unless options.has_key?(:null)
+            options[:null] = column.null
+          end
+
+          change_column_sql = "CHANGE #{quote_column_name(column_name)} #{quote_column_name(column_name)} #{type_to_sql(type, options[:limit], options[:precision], options[:scale])}"
+          add_column_options!(change_column_sql, options)
+          add_column_position!(change_column_sql, options)
+          change_column_sql
+        end
+
+        def rename_column_sql(table_name, column_name, new_column_name)
+          options = {}
+
+          if column = columns(table_name).find { |c| c.name == column_name.to_s }
+            options[:default] = column.default
+            options[:null] = column.null
+          else
+            raise ActiveRecordError, "No such column: #{table_name}.#{column_name}"
+          end
+
+          current_type = select_one("SHOW COLUMNS FROM #{quote_table_name(table_name)} LIKE '#{column_name}'")["Type"]
+          rename_column_sql = "CHANGE #{quote_column_name(column_name)} #{quote_column_name(new_column_name)} #{current_type}"
+          add_column_options!(rename_column_sql, options)
+          rename_column_sql
+        end
+
+        def add_index_sql(table_name, column_name, options = {})
+          index_name, index_type, index_columns = add_index_options(table_name, column_name, options)
+          "ADD #{index_type} INDEX #{index_name} (#{index_columns})"
+        end
+
+        def remove_index_sql(table_name, options = {})
+          index_name = index_name_for_remove(table_name, options)
+          "DROP INDEX #{index_name}"
+        end
+
+        def add_timestamps_sql(table_name)
+          [add_column_sql(table_name, :created_at, :datetime), add_column_sql(table_name, :updated_at, :datetime)]
+        end
+
+        def remove_timestamps_sql(table_name)
+          [remove_column_sql(table_name, :updated_at), remove_column_sql(table_name, :created_at)]
+        end
 
       private
         def connect
@@ -573,6 +747,10 @@ module ActiveRecord
             @connection.ssl_set(@config[:sslkey], @config[:sslcert], @config[:sslca], @config[:sslcapath], @config[:sslcipher])
           end
 
+          @connection.options(Mysql::OPT_CONNECT_TIMEOUT, @config[:connect_timeout]) if @config[:connect_timeout]
+          @connection.options(Mysql::OPT_READ_TIMEOUT, @config[:read_timeout]) if @config[:read_timeout]
+          @connection.options(Mysql::OPT_WRITE_TIMEOUT, @config[:write_timeout]) if @config[:write_timeout]
+
           @connection.real_connect(*@connection_options)
 
           # reconnect must be set after real_connect is called, because real_connect sets it to false internally
@@ -583,18 +761,17 @@ module ActiveRecord
 
         def configure_connection
           encoding = @config[:encoding]
-          execute("SET NAMES '#{encoding}'") if encoding
+          execute("SET NAMES '#{encoding}'", :skip_logging) if encoding
 
           # By default, MySQL 'where id is null' selects the last inserted id.
           # Turn this off. http://dev.rubyonrails.org/ticket/6778
-          execute("SET SQL_AUTO_IS_NULL=0")
+          execute("SET SQL_AUTO_IS_NULL=0", :skip_logging)
         end
 
-        def select(sql, name = nil)
+        def select(sql, name = nil, binds = [])
           @connection.query_with_result = true
-          result = execute(sql, name)
-          rows = result.all_hashes
-          result.free
+          rows = exec_query(sql, name, binds).to_a
+          @connection.more_results && @connection.next_result    # invoking stored procedures with CLIENT_MULTI_RESULTS requires this to tidy up else connection will be dropped
           rows
         end
 

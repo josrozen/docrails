@@ -1,8 +1,13 @@
-require "date"
+require 'date'
 require 'action_view/helpers/tag_helper'
+require 'active_support/core_ext/date/conversions'
+require 'active_support/core_ext/hash/slice'
+require 'active_support/core_ext/object/with_options'
 
 module ActionView
   module Helpers
+    # = Action View Date Helpers
+    #
     # The Date Helper primarily creates select/option tags for different kinds of dates and date elements. All of the
     # select-type methods share a number of common options that are as follows:
     #
@@ -26,8 +31,10 @@ module ActionView
       #   47 hrs, 59 mins, 29 secs <-> 29 days, 23 hrs, 59 mins, 29 secs            # => [2..29] days
       #   29 days, 23 hrs, 59 mins, 30 secs <-> 59 days, 23 hrs, 59 mins, 29 secs   # => about 1 month
       #   59 days, 23 hrs, 59 mins, 30 secs <-> 1 yr minus 1 sec                    # => [2..12] months
-      #   1 yr <-> 2 yrs minus 1 secs                                               # => about 1 year
-      #   2 yrs <-> max time or date                                                # => over [2..X] years
+      #   1 yr <-> 1 yr, 3 months                                                   # => about 1 year
+      #   1 yr, 3 months <-> 1 yr, 9 months                                         # => over 1 year
+      #   1 yr, 9 months <-> 2 yr minus 1 sec                                       # => almost 2 years
+      #   2 yrs <-> max time or date                                                # => (same rules as 1 yr)
       #
       # With <tt>include_seconds</tt> = true and the difference < 1 minute 29 seconds:
       #   0-4   secs      # => less than 5 seconds
@@ -43,17 +50,18 @@ module ActionView
       #   distance_of_time_in_words(from_time, 50.minutes.from_now)           # => about 1 hour
       #   distance_of_time_in_words(from_time, from_time + 15.seconds)        # => less than a minute
       #   distance_of_time_in_words(from_time, from_time + 15.seconds, true)  # => less than 20 seconds
-      #   distance_of_time_in_words(from_time, 3.years.from_now)              # => over 3 years
+      #   distance_of_time_in_words(from_time, 3.years.from_now)              # => about 3 years
       #   distance_of_time_in_words(from_time, from_time + 60.hours)          # => about 3 days
       #   distance_of_time_in_words(from_time, from_time + 45.seconds, true)  # => less than a minute
       #   distance_of_time_in_words(from_time, from_time - 45.seconds, true)  # => less than a minute
       #   distance_of_time_in_words(from_time, 76.seconds.from_now)           # => 1 minute
       #   distance_of_time_in_words(from_time, from_time + 1.year + 3.days)   # => about 1 year
-      #   distance_of_time_in_words(from_time, from_time + 4.years + 9.days + 30.minutes + 5.seconds) # => over 4 years
+      #   distance_of_time_in_words(from_time, from_time + 3.years + 6.months) # => over 3 years
+      #   distance_of_time_in_words(from_time, from_time + 4.years + 9.days + 30.minutes + 5.seconds) # => about 4 years
       #
       #   to_time = Time.now + 6.years + 19.days
-      #   distance_of_time_in_words(from_time, to_time, true)     # => over 6 years
-      #   distance_of_time_in_words(to_time, from_time, true)     # => over 6 years
+      #   distance_of_time_in_words(from_time, to_time, true)     # => about 6 years
+      #   distance_of_time_in_words(to_time, from_time, true)     # => about 6 years
       #   distance_of_time_in_words(Time.now, Time.now)           # => less than a minute
       #
       def distance_of_time_in_words(from_time, to_time = 0, include_seconds = false, options = {})
@@ -81,12 +89,21 @@ module ActionView
             when 2..44           then locale.t :x_minutes,      :count => distance_in_minutes
             when 45..89          then locale.t :about_x_hours,  :count => 1
             when 90..1439        then locale.t :about_x_hours,  :count => (distance_in_minutes.to_f / 60.0).round
-            when 1440..2879      then locale.t :x_days,         :count => 1
-            when 2880..43199     then locale.t :x_days,         :count => (distance_in_minutes / 1440).round
+            when 1440..2529      then locale.t :x_days,         :count => 1
+            when 2530..43199     then locale.t :x_days,         :count => (distance_in_minutes.to_f / 1440.0).round
             when 43200..86399    then locale.t :about_x_months, :count => 1
-            when 86400..525599   then locale.t :x_months,       :count => (distance_in_minutes / 43200).round
-            when 525600..1051199 then locale.t :about_x_years,  :count => 1
-            else                      locale.t :over_x_years,   :count => (distance_in_minutes / 525600).round
+            when 86400..525599   then locale.t :x_months,       :count => (distance_in_minutes.to_f / 43200.0).round
+            else
+              distance_in_years           = distance_in_minutes / 525600
+              minute_offset_for_leap_year = (distance_in_years / 4) * 1440
+              remainder                   = ((distance_in_minutes - minute_offset_for_leap_year) % 525600)
+              if remainder < 131400
+                locale.t(:about_x_years,  :count => distance_in_years)
+              elsif remainder < 394200
+                locale.t(:over_x_years,   :count => distance_in_years)
+              else
+                locale.t(:almost_x_years, :count => distance_in_years + 1)
+              end
           end
         end
       end
@@ -112,12 +129,12 @@ module ActionView
       # ==== Options
       # * <tt>:use_month_numbers</tt> - Set to true if you want to use month numbers rather than month names (e.g.
       #   "2" instead of "February").
-      # * <tt>:use_short_month</tt>   - Set to true if you want to use the abbreviated month name instead of the full
-      #   name (e.g. "Feb" instead of "February").
-      # * <tt>:add_month_number</tt>  - Set to true if you want to show both, the month's number and name (e.g.
+      # * <tt>:use_short_month</tt>   - Set to true if you want to use abbreviated month names instead of full
+      #   month names (e.g. "Feb" instead of "February").
+      # * <tt>:add_month_numbers</tt>  - Set to true if you want to use both month numbers and month names (e.g.
       #   "2 - February" instead of "February").
       # * <tt>:use_month_names</tt>   - Set to an array with 12 month names if you want to customize month names.
-      #   Note: You can also use Rails' new i18n functionality for this.
+      #   Note: You can also use Rails' i18n functionality for this.
       # * <tt>:date_separator</tt>    - Specifies a string to separate the date fields. Default is "" (i.e. nothing).
       # * <tt>:start_year</tt>        - Set the start year for the year select. Default is <tt>Time.now.year - 5</tt>.
       # * <tt>:end_year</tt>          - Set the end year for the year select. Default is <tt>Time.now.year + 5</tt>.
@@ -128,7 +145,7 @@ module ActionView
       #   as a hidden field instead of showing a select field. Also note that this implicitly sets :discard_day to true.
       # * <tt>:discard_year</tt>      - Set to true if you don't want to show a year select. This includes the year
       #   as a hidden field instead of showing a select field.
-      # * <tt>:order</tt>             - Set to an array containing <tt>:day</tt>, <tt>:month</tt> and <tt>:year</tt> do
+      # * <tt>:order</tt>             - Set to an array containing <tt>:day</tt>, <tt>:month</tt> and <tt>:year</tt> to
       #   customize the order in which the select fields are shown. If you leave out any of the symbols, the respective
       #   select will not be shown (like when you set <tt>:discard_xxx => true</tt>. Defaults to the order defined in
       #   the respective locale (e.g. [:year, :month, :day] in the en locale that ships with Rails).
@@ -199,20 +216,9 @@ module ActionView
       #   # Creates a time select tag that, when POSTed, will be stored in the post variable in the sunrise attribute
       #   time_select("post", "sunrise")
       #
-      #   # Creates a time select tag that, when POSTed, will be stored in the order variable in the submitted
-      #   # attribute
-      #   time_select("order", "submitted")
-      #
-      #   # Creates a time select tag that, when POSTed, will be stored in the mail variable in the sent_at attribute
-      #   time_select("mail", "sent_at")
-      #
       #   # Creates a time select tag with a seconds field that, when POSTed, will be stored in the post variables in
       #   # the sunrise attribute.
       #   time_select("post", "start_time", :include_seconds => true)
-      #
-      #   # Creates a time select tag with a seconds field that, when POSTed, will be stored in the entry variables in
-      #   # the submission_time attribute.
-      #   time_select("entry", "submission_time", :include_seconds => true)
       #
       #   # You can set the :minute_step to 15 which will give you: 00, 15, 30 and 45.
       #   time_select 'game', 'game_time', {:minute_step => 15}
@@ -561,71 +567,86 @@ module ActionView
       def select_year(date, options = {}, html_options = {})
         DateTimeSelector.new(date, options, html_options).select_year
       end
+
+      # Returns an html time tag for the given date or time.
+      #
+      # ==== Examples
+      #   time_tag Date.today  # =>
+      #     <time datetime="2010-11-04">November 04, 2010</time>
+      #   time_tag Time.now  # =>
+      #     <time datetime="2010-11-04T17:55:45+01:00">November 04, 2010 17:55</time>
+      #   time_tag Date.yesterday, 'Yesterday'  # =>
+      #     <time datetime="2010-11-03">Yesterday</time>
+      #   time_tag Date.today, :pubdate => true  # =>
+      #     <time datetime="2010-11-04" pubdate="pubdate">November 04, 2010</time>
+      #
+      def time_tag(date_or_time, *args)
+        options  = args.extract_options!
+        format   = options.delete(:format) || :long
+        content  = args.first || I18n.l(date_or_time, :format => format)
+        datetime = date_or_time.acts_like?(:time) ? date_or_time.xmlschema : date_or_time.rfc3339
+
+        content_tag(:time, content, options.reverse_merge(:datetime => datetime))
+      end
     end
 
     class DateTimeSelector #:nodoc:
       extend ActiveSupport::Memoizable
       include ActionView::Helpers::TagHelper
 
-      DEFAULT_PREFIX = 'date'.freeze unless const_defined?('DEFAULT_PREFIX')
+      DEFAULT_PREFIX = 'date'.freeze
       POSITION = {
         :year => 1, :month => 2, :day => 3, :hour => 4, :minute => 5, :second => 6
-      }.freeze unless const_defined?('POSITION')
+      }.freeze
 
       def initialize(datetime, options = {}, html_options = {})
         @options      = options.dup
         @html_options = html_options.dup
         @datetime     = datetime
+        @options[:datetime_separator] ||= ' &mdash; '
+        @options[:time_separator]     ||= ' : '
       end
 
       def select_datetime
-        # TODO: Remove tag conditional
-        # Ideally we could just join select_date and select_date for the tag case
+        order = date_order.dup
+        order -= [:hour, :minute, :second]
+        @options[:discard_year]   ||= true unless order.include?(:year)
+        @options[:discard_month]  ||= true unless order.include?(:month)
+        @options[:discard_day]    ||= true if @options[:discard_month] || !order.include?(:day)
+        @options[:discard_minute] ||= true if @options[:discard_hour]
+        @options[:discard_second] ||= true unless @options[:include_seconds] && !@options[:discard_minute]
+
+        # If the day is hidden and the month is visible, the day should be set to the 1st so all month choices are
+        # valid (otherwise it could be 31 and february wouldn't be a valid date)
+        if @datetime && @options[:discard_day] && !@options[:discard_month]
+          @datetime = @datetime.change(:day => 1)
+        end
+
         if @options[:tag] && @options[:ignore_date]
           select_time
-        elsif @options[:tag]
-          order = date_order.dup
-          order -= [:hour, :minute, :second]
-
-          @options[:discard_year]   ||= true unless order.include?(:year)
-          @options[:discard_month]  ||= true unless order.include?(:month)
-          @options[:discard_day]    ||= true if @options[:discard_month] || !order.include?(:day)
-          @options[:discard_minute] ||= true if @options[:discard_hour]
-          @options[:discard_second] ||= true unless @options[:include_seconds] && !@options[:discard_minute]
-
-          # If the day is hidden and the month is visible, the day should be set to the 1st so all month choices are
-          # valid (otherwise it could be 31 and february wouldn't be a valid date)
-          if @datetime && @options[:discard_day] && !@options[:discard_month]
-            @datetime = @datetime.change(:day => 1)
-          end
-
+        else
           [:day, :month, :year].each { |o| order.unshift(o) unless order.include?(o) }
           order += [:hour, :minute, :second] unless @options[:discard_hour]
 
           build_selects_from_types(order)
-        else
-          "#{select_date}#{@options[:datetime_separator]}#{select_time}"
         end
       end
 
       def select_date
         order = date_order.dup
 
-        # TODO: Remove tag conditional
-        if @options[:tag]
-          @options[:discard_hour]     = true
-          @options[:discard_minute]   = true
-          @options[:discard_second]   = true
+        @options[:discard_hour]     = true
+        @options[:discard_minute]   = true
+        @options[:discard_second]   = true
 
-          @options[:discard_year]   ||= true unless order.include?(:year)
-          @options[:discard_month]  ||= true unless order.include?(:month)
-          @options[:discard_day]    ||= true if @options[:discard_month] || !order.include?(:day)
+        @options[:discard_year]   ||= true unless order.include?(:year)
+        @options[:discard_month]  ||= true unless order.include?(:month)
+        @options[:discard_day]    ||= true if @options[:discard_month] || !order.include?(:day)
 
-          # If the day is hidden and the month is visible, the day should be set to the 1st so all month choices are
-          # valid (otherwise it could be 31 and february wouldn't be a valid date)
-          if @datetime && @options[:discard_day] && !@options[:discard_month]
-            @datetime = @datetime.change(:day => 1)
-          end
+        # If the day is hidden and the month is visible, the day should be set to the 1st so all month choices are
+        # valid (otherwise it could be 31 and february wouldn't be a valid date)
+        if @datetime && @options[:discard_day] && !@options[:discard_month]
+          @datetime = @datetime.change(:day => 1)
         end
 
         [:day, :month, :year].each { |o| order.unshift(o) unless order.include?(o) }
@@ -636,15 +657,12 @@ module ActionView
       def select_time
         order = []
 
-        # TODO: Remove tag conditional
-        if @options[:tag]
-          @options[:discard_month]    = true
-          @options[:discard_year]     = true
-          @options[:discard_day]      = true
-          @options[:discard_second] ||= true unless @options[:include_seconds]
+        @options[:discard_month]    = true
+        @options[:discard_year]     = true
+        @options[:discard_day]      = true
+        @options[:discard_second] ||= true unless @options[:include_seconds]
 
-          order += [:year, :month, :day] unless @options[:ignore_date]
-        end
+        order += [:year, :month, :day] unless @options[:ignore_date]
 
         order += [:hour, :minute]
         order << :second if @options[:include_seconds]
@@ -745,10 +763,8 @@ module ActionView
         #  => [nil, "Jan", "Feb", "Mar", "Apr", "May", "Jun",
         #           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         def translated_month_names
-          begin
-            key = @options[:use_short_month] ? :'date.abbr_month_names' : :'date.month_names'
-            I18n.translate(key, :locale => @options[:locale])
-          end
+          key = @options[:use_short_month] ? :'date.abbr_month_names' : :'date.month_names'
+          I18n.translate(key, :locale => @options[:locale])
         end
 
         # Lookup month name for number
@@ -775,9 +791,7 @@ module ActionView
         memoize :date_order
 
         def translated_date_order
-          begin
-            I18n.translate(:'date.order', :locale => @options[:locale]) || []
-          end
+          I18n.translate(:'date.order', :locale => @options[:locale]) || []
         end
 
         # Build full select tag from date type and options
@@ -794,7 +808,8 @@ module ActionView
           start         = options.delete(:start) || 0
           stop          = options.delete(:end) || 59
           step          = options.delete(:step) || 1
-          leading_zeros = options.delete(:leading_zeros).nil? ? true : false
+          options.reverse_merge!({:leading_zeros => true})
+          leading_zeros = options.delete(:leading_zeros)
 
           select_options = []
           start.step(stop, step) do |i|
@@ -803,7 +818,7 @@ module ActionView
             tag_options[:selected] = "selected" if selected == i
             select_options << content_tag(:option, value, tag_options)
           end
-          select_options.join("\n") + "\n"
+          (select_options.join("\n") + "\n").html_safe
         end
 
         # Builds select tag from date type and html select options
@@ -821,24 +836,23 @@ module ActionView
           select_html = "\n"
           select_html << content_tag(:option, '', :value => '') + "\n" if @options[:include_blank]
           select_html << prompt_option_tag(type, @options[:prompt]) + "\n" if @options[:prompt]
-          select_html << select_options_as_html.to_s
+          select_html << select_options_as_html
 
-          content_tag(:select, select_html, select_options) + "\n"
+          (content_tag(:select, select_html.html_safe, select_options) + "\n").html_safe
         end
 
         # Builds a prompt option tag with supplied options or from default options
         #  prompt_option_tag(:month, :prompt => 'Select month')
         #  => "<option value="">Select month</option>"
         def prompt_option_tag(type, options)
-          default_options = {:year => false, :month => false, :day => false, :hour => false, :minute => false, :second => false}
-
-          case options
-          when Hash
-            prompt = default_options.merge(options)[type.to_sym]
-          when String
-            prompt = options
-          else
-            prompt = I18n.translate(('datetime.prompts.' + type.to_s).to_sym, :locale => @options[:locale])
+          prompt = case options
+            when Hash
+              default_options = {:year => false, :month => false, :day => false, :hour => false, :minute => false, :second => false}
+              default_options.merge!(options)[type.to_sym]
+            when String
+              options
+            else
+              I18n.translate(:"datetime.prompts.#{type}", :locale => @options[:locale])
           end
 
           prompt ? content_tag(:option, prompt, :value => '') : ''
@@ -848,12 +862,12 @@ module ActionView
         #  build_hidden(:year, 2008)
         #  => "<input id="post_written_on_1i" name="post[written_on(1i)]" type="hidden" value="2008" />"
         def build_hidden(type, value)
-          tag(:input, {
+          (tag(:input, {
             :type => "hidden",
             :id => input_id_from_type(type),
             :name => input_name_from_type(type),
             :value => value
-          }) + "\n"
+          }.merge(@html_options.slice(:disabled))) + "\n").html_safe
         end
 
         # Returns the name attribute for the input tag
@@ -884,18 +898,22 @@ module ActionView
             separator = separator(type) unless type == order.first # don't add on last field
             select.insert(0, separator.to_s + send("select_#{type}").to_s)
           end
-          select
+          select.html_safe
         end
 
         # Returns the separator for a given datetime component
         def separator(type)
           case type
-            when :month, :day
-              @options[:date_separator]
+            when :year
+              @options[:discard_year] ? "" : @options[:date_separator]
+            when :month
+              @options[:discard_month] ? "" : @options[:date_separator]
+            when :day
+              @options[:discard_day] ? "" : @options[:date_separator]
             when :hour
               (@options[:discard_year] && @options[:discard_day]) ? "" : @options[:datetime_separator]
             when :minute
-              @options[:time_separator]
+              @options[:discard_minute] ? "" : @options[:time_separator]
             when :second
               @options[:include_seconds] ? @options[:time_separator] : ""
           end
@@ -904,30 +922,29 @@ module ActionView
 
     class InstanceTag #:nodoc:
       def to_date_select_tag(options = {}, html_options = {})
-        datetime_selector(options, html_options).select_date
+        datetime_selector(options, html_options).select_date.html_safe
       end
 
       def to_time_select_tag(options = {}, html_options = {})
-        datetime_selector(options, html_options).select_time
+        datetime_selector(options, html_options).select_time.html_safe
       end
 
       def to_datetime_select_tag(options = {}, html_options = {})
-        datetime_selector(options, html_options).select_datetime
+        datetime_selector(options, html_options).select_datetime.html_safe
       end
 
       private
         def datetime_selector(options, html_options)
           datetime = value(object) || default_datetime(options)
+          @auto_index ||= nil
 
           options = options.dup
           options[:field_name]           = @method_name
           options[:include_position]     = true
           options[:prefix]             ||= @object_name
           options[:index]                = @auto_index if @auto_index && !options.has_key?(:index)
-          options[:datetime_separator] ||= ' &mdash; '
-          options[:time_separator]     ||= ' : '
 
-          DateTimeSelector.new(datetime, options.merge(:tag => true), html_options)
+          DateTimeSelector.new(datetime, options, html_options)
         end
 
         def default_datetime(options)

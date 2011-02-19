@@ -1,4 +1,5 @@
 require 'active_support/core_ext/array/wrap'
+require 'active_support/core_ext/object/blank'
 
 module ActiveSupport
   module Testing
@@ -61,6 +62,22 @@ module ActiveSupport
       #   end
       def assert_no_difference(expression, message = nil, &block)
         assert_difference expression, 0, message, &block
+      end
+
+      # Test if an expression is blank. Passes if object.blank? is true.
+      #
+      #   assert_blank [] # => true
+      def assert_blank(object, message=nil)
+        message ||= "#{object.inspect} is not blank"
+        assert object.blank?, message
+      end
+
+      # Test if an expression is not blank. Passes if object.present? is true.
+      #
+      #   assert_present {:data => 'x' } # => true
+      def assert_present(object, message=nil)
+        message ||= "#{object.inspect} is blank"
+        assert object.present?, message
       end
     end
   end

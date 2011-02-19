@@ -1,47 +1,52 @@
 require 'abstract_unit'
 
-class ContentTypeController < ActionController::Base
+class OldContentTypeController < ActionController::Base
+  # :ported:
   def render_content_type_from_body
     response.content_type = Mime::RSS
     render :text => "hello world!"
   end
 
+  # :ported:
   def render_defaults
     render :text => "hello world!"
   end
 
+  # :ported:
   def render_content_type_from_render
     render :text => "hello world!", :content_type => Mime::RSS
   end
 
+  # :ported:
   def render_charset_from_body
     response.charset = "utf-16"
     render :text => "hello world!"
   end
 
+  # :ported:
   def render_nil_charset_from_body
     response.charset = nil
     render :text => "hello world!"
   end
 
-  def render_default_for_rhtml
+  def render_default_for_erb
   end
 
-  def render_default_for_rxml
+  def render_default_for_builder
   end
 
   def render_default_for_rjs
   end
 
-  def render_change_for_rxml
+  def render_change_for_builder
     response.content_type = Mime::HTML
-    render :action => "render_default_for_rxml"
+    render :action => "render_default_for_builder"
   end
 
   def render_default_content_types_for_respond_to
     respond_to do |format|
       format.html { render :text   => "hello world!" }
-      format.xml  { render :action => "render_default_content_types_for_respond_to.rhtml" }
+      format.xml  { render :action => "render_default_content_types_for_respond_to" }
       format.js   { render :text   => "hello world!" }
       format.rss  { render :text   => "hello world!", :content_type => Mime::XML }
     end
@@ -51,7 +56,7 @@ class ContentTypeController < ActionController::Base
 end
 
 class ContentTypeTest < ActionController::TestCase
-  tests ContentTypeController
+  tests OldContentTypeController
 
   def setup
     super
@@ -60,6 +65,7 @@ class ContentTypeTest < ActionController::TestCase
     @controller.logger = Logger.new(nil)
   end
 
+  # :ported:
   def test_render_defaults
     get :render_defaults
     assert_equal "utf-8", @response.charset
@@ -67,54 +73,58 @@ class ContentTypeTest < ActionController::TestCase
   end
 
   def test_render_changed_charset_default
-    ContentTypeController.default_charset = "utf-16"
+    OldContentTypeController.default_charset = "utf-16"
     get :render_defaults
     assert_equal "utf-16", @response.charset
     assert_equal Mime::HTML, @response.content_type
-    ContentTypeController.default_charset = "utf-8"
+    OldContentTypeController.default_charset = "utf-8"
   end
 
+  # :ported:
   def test_content_type_from_body
     get :render_content_type_from_body
-    assert_equal "application/rss+xml", @response.content_type
+    assert_equal Mime::RSS, @response.content_type
     assert_equal "utf-8", @response.charset
   end
 
+  # :ported:
   def test_content_type_from_render
     get :render_content_type_from_render
-    assert_equal "application/rss+xml", @response.content_type
+    assert_equal Mime::RSS, @response.content_type
     assert_equal "utf-8", @response.charset
   end
 
+  # :ported:
   def test_charset_from_body
     get :render_charset_from_body
     assert_equal Mime::HTML, @response.content_type
     assert_equal "utf-16", @response.charset
   end
 
+  # :ported:
   def test_nil_charset_from_body
     get :render_nil_charset_from_body
     assert_equal Mime::HTML, @response.content_type
     assert_equal "utf-8", @response.charset, @response.headers.inspect
   end
 
-  def test_nil_default_for_rhtml
-    ContentTypeController.default_charset = nil
-    get :render_default_for_rhtml
+  def test_nil_default_for_erb
+    OldContentTypeController.default_charset = nil
+    get :render_default_for_erb
     assert_equal Mime::HTML, @response.content_type
     assert_nil @response.charset, @response.headers.inspect
   ensure
-    ContentTypeController.default_charset = "utf-8"
+    OldContentTypeController.default_charset = "utf-8"
   end
 
-  def test_default_for_rhtml
-    get :render_default_for_rhtml
+  def test_default_for_erb
+    get :render_default_for_erb
     assert_equal Mime::HTML, @response.content_type
     assert_equal "utf-8", @response.charset
   end
 
-  def test_default_for_rxml
-    get :render_default_for_rxml
+  def test_default_for_builder
+    get :render_default_for_builder
     assert_equal Mime::XML, @response.content_type
     assert_equal "utf-8", @response.charset
   end
@@ -125,27 +135,15 @@ class ContentTypeTest < ActionController::TestCase
     assert_equal "utf-8", @response.charset
   end
 
-  def test_change_for_rxml
-    get :render_change_for_rxml
+  def test_change_for_builder
+    get :render_change_for_builder
     assert_equal Mime::HTML, @response.content_type
     assert_equal "utf-8", @response.charset
   end
 end
 
 class AcceptBasedContentTypeTest < ActionController::TestCase
-
-  tests ContentTypeController
-
-  def setup
-    super
-    ActionController::Base.use_accept_header = true
-  end
-
-  def teardown
-    super
-    ActionController::Base.use_accept_header = false
-  end
-
+  tests OldContentTypeController
 
   def test_render_default_content_types_for_respond_to
     @request.accept = Mime::HTML.to_s

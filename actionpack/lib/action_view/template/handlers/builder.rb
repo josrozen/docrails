@@ -1,13 +1,13 @@
-require 'builder'
-
 module ActionView
-  module TemplateHandlers
-    class Builder < TemplateHandler
-      include Compilable
+  module Template::Handlers
+    class Builder
+      # Default format used by Builder.
+      class_attribute :default_format
+      self.default_format = Mime::XML
 
-      def compile(template)
-        "_set_controller_content_type(Mime::XML);" +
-          "xml = ::Builder::XmlMarkup.new(:indent => 2);" +
+      def call(template)
+        require 'builder'
+        "xml = ::Builder::XmlMarkup.new(:indent => 2);" +
           "self.output_buffer = xml.target!;" +
           template.source +
           ";xml.target!;"

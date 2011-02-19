@@ -22,6 +22,34 @@ class InflectorTest < Test::Unit::TestCase
     assert_equal "", ActiveSupport::Inflector.pluralize("")
   end
 
+  ActiveSupport::Inflector.inflections.uncountable.each do |word|
+    define_method "test_uncountability_of_#{word}" do
+      assert_equal word, ActiveSupport::Inflector.singularize(word)
+      assert_equal word, ActiveSupport::Inflector.pluralize(word)
+      assert_equal ActiveSupport::Inflector.pluralize(word), ActiveSupport::Inflector.singularize(word)
+    end
+  end
+
+  def test_uncountable_word_is_not_greedy
+    uncountable_word = "ors"
+    countable_word = "sponsor"
+
+    cached_uncountables = ActiveSupport::Inflector.inflections.uncountables
+
+    ActiveSupport::Inflector.inflections.uncountable << uncountable_word
+
+    assert_equal uncountable_word, ActiveSupport::Inflector.singularize(uncountable_word)
+    assert_equal uncountable_word, ActiveSupport::Inflector.pluralize(uncountable_word)
+    assert_equal ActiveSupport::Inflector.pluralize(uncountable_word), ActiveSupport::Inflector.singularize(uncountable_word)
+
+    assert_equal "sponsor", ActiveSupport::Inflector.singularize(countable_word)
+    assert_equal "sponsors", ActiveSupport::Inflector.pluralize(countable_word)
+    assert_equal "sponsor", ActiveSupport::Inflector.singularize(ActiveSupport::Inflector.pluralize(countable_word))
+
+  ensure
+    ActiveSupport::Inflector.inflections.instance_variable_set :@uncountables, cached_uncountables
+  end
+
   SingularToPlural.each do |singular, plural|
     define_method "test_pluralize_#{singular}" do
       assert_equal(plural, ActiveSupport::Inflector.pluralize(singular))
@@ -33,6 +61,13 @@ class InflectorTest < Test::Unit::TestCase
     define_method "test_singularize_#{plural}" do
       assert_equal(singular, ActiveSupport::Inflector.singularize(plural))
       assert_equal(singular.capitalize, ActiveSupport::Inflector.singularize(plural.capitalize))
+    end
+  end
+  
+  SingularToPlural.each do |singular, plural|
+    define_method "test_pluralize_#{plural}" do
+      assert_equal(plural, ActiveSupport::Inflector.pluralize(plural))
+      assert_equal(plural.capitalize, ActiveSupport::Inflector.pluralize(plural.capitalize))
     end
   end
 
@@ -202,15 +237,21 @@ class InflectorTest < Test::Unit::TestCase
     end
   end
 
+  def test_symbol_to_lower_camel
+    SymbolToLowerCamel.each do |symbol, lower_camel|
+      assert_equal(lower_camel, ActiveSupport::Inflector.camelize(symbol, false))
+    end
+  end
+
   %w{plurals singulars uncountables humans}.each do |inflection_type|
-    class_eval "
+    class_eval <<-RUBY, __FILE__, __LINE__ + 1
       def test_clear_#{inflection_type}
         cached_values = ActiveSupport::Inflector.inflections.#{inflection_type}
         ActiveSupport::Inflector.inflections.clear :#{inflection_type}
         assert ActiveSupport::Inflector.inflections.#{inflection_type}.empty?, \"#{inflection_type} inflections should be empty after clear :#{inflection_type}\"
         ActiveSupport::Inflector.inflections.instance_variable_set :@#{inflection_type}, cached_values
       end
-    "
+    RUBY
   end
 
   def test_clear_all
@@ -246,6 +287,16 @@ class InflectorTest < Test::Unit::TestCase
         inflect.irregular(singular, plural)
         assert_equal singular, ActiveSupport::Inflector.singularize(plural)
         assert_equal plural, ActiveSupport::Inflector.pluralize(singular)
+      end
+    end
+  end
+
+  Irregularities.each do |irregularity|
+    singular, plural = *irregularity
+    ActiveSupport::Inflector.inflections do |inflect|
+      define_method("test_pluralize_of_irregularity_#{plural}_should_be_the_same") do
+        inflect.irregular(singular, plural)
+        assert_equal plural, ActiveSupport::Inflector.pluralize(plural)
       end
     end
   end

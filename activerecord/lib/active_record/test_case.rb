@@ -1,7 +1,18 @@
-require "active_support/test_case"
-
 module ActiveRecord
+  # = Active Record Test Case
+  #
+  # Defines some test assertions to test against SQL queries.
   class TestCase < ActiveSupport::TestCase #:nodoc:
+    setup :cleanup_identity_map
+
+    def setup
+      cleanup_identity_map
+    end
+
+    def cleanup_identity_map
+      ActiveRecord::IdentityMap.clear
+    end
+
     def assert_date_from_db(expected, actual, message = nil)
       # SybaseAdapter doesn't have a separate column type just for dates,
       # so the time is in the string and incorrectly formatted
@@ -20,7 +31,7 @@ module ActiveRecord
       patterns_to_match.each do |pattern|
         failed_patterns << pattern unless $queries_executed.any?{ |sql| pattern === sql }
       end
-      assert failed_patterns.empty?, "Query pattern(s) #{failed_patterns.map(&:inspect).join(', ')} not found.#{$queries_executed.size == 0 ? '' : "\nQueries:\n#{$queries_executed.join("\n")}"}"
+      assert failed_patterns.empty?, "Query pattern(s) #{failed_patterns.map{ |p| p.inspect }.join(', ')} not found.#{$queries_executed.size == 0 ? '' : "\nQueries:\n#{$queries_executed.join("\n")}"}"
     end
 
     def assert_queries(num = 1)
@@ -33,21 +44,6 @@ module ActiveRecord
 
     def assert_no_queries(&block)
       assert_queries(0, &block)
-    end
-
-    def self.use_concurrent_connections
-      setup :connection_allow_concurrency_setup
-      teardown :connection_allow_concurrency_teardown
-    end
-
-    def connection_allow_concurrency_setup
-      @connection = ActiveRecord::Base.remove_connection
-      ActiveRecord::Base.establish_connection(@connection.merge({:allow_concurrency => true}))
-    end
-
-    def connection_allow_concurrency_teardown
-      ActiveRecord::Base.clear_all_connections!
-      ActiveRecord::Base.establish_connection(@connection)
     end
 
     def with_kcode(kcode)

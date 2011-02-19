@@ -42,17 +42,13 @@ module ActiveRecord
     # To override the name of the lock_version column, invoke the <tt>set_locking_column</tt> method.
     # This method uses the same syntax as <tt>set_table_name</tt>
     module Optimistic
-      def self.included(base) #:nodoc:
-        base.extend ClassMethods
+      extend ActiveSupport::Concern
 
-        base.cattr_accessor :lock_optimistically, :instance_writer => false
-        base.lock_optimistically = true
+      included do
+        cattr_accessor :lock_optimistically, :instance_writer => false
+        self.lock_optimistically = true
 
-        base.alias_method_chain :update, :lock
-        base.alias_method_chain :destroy, :lock
-        base.alias_method_chain :attributes_from_column_definition, :lock
-
-        class << base
+        class << self
           alias_method :locking_column=, :set_locking_column
         end
       end
@@ -62,8 +58,14 @@ module ActiveRecord
       end
 
       private
-        def attributes_from_column_definition_with_lock
-          result = attributes_from_column_definition_without_lock
+        def increment_lock
+          lock_col = self.class.locking_column
+          previous_lock_value = send(lock_col).to_i
+          send(lock_col + '=', previous_lock_value + 1)
+        end
+
+        def attributes_from_column_definition
+          result = super
 
           # If the locking column has no default value set,
           # start the lock version at zero.  Note we can't use
@@ -74,71 +76,66 @@ module ActiveRecord
             result[self.class.locking_column] ||= 0
           end
 
-          return result
+          result
         end
 
-        def update_with_lock(attribute_names = @attributes.keys) #:nodoc:
-          return update_without_lock(attribute_names) unless locking_enabled?
+        def update(attribute_names = @attributes.keys) #:nodoc:
+          return super unless locking_enabled?
           return 0 if attribute_names.empty?
 
           lock_col = self.class.locking_column
-          previous_value = send(lock_col).to_i
-          send(lock_col + '=', previous_value + 1)
+          previous_lock_value = send(lock_col).to_i
+          increment_lock
 
           attribute_names += [lock_col]
           attribute_names.uniq!
 
           begin
-            affected_rows = connection.update(<<-end_sql, "#{self.class.name} Update with optimistic locking")
-              UPDATE #{self.class.quoted_table_name}
-              SET #{quoted_comma_pair_list(connection, attributes_with_quotes(false, false, attribute_names))}
-              WHERE #{self.class.primary_key} = #{quote_value(id)}
-              AND #{self.class.quoted_locking_column} = #{quote_value(previous_value)}
-            end_sql
+            relation = self.class.unscoped
+
+            stmt = relation.where(
+              relation.table[self.class.primary_key].eq(quoted_id).and(
+                relation.table[lock_col].eq(quote_value(previous_lock_value))
+              )
+            ).arel.compile_update(arel_attributes_values(false, false, attribute_names))
+
+            affected_rows = connection.update stmt.to_sql
 
             unless affected_rows == 1
-              raise ActiveRecord::StaleObjectError, "Attempted to update a stale object"
+              raise ActiveRecord::StaleObjectError, "Attempted to update a stale object: #{self.class.name}"
             end
 
             affected_rows
 
           # If something went wrong, revert the version.
           rescue Exception
-            send(lock_col + '=', previous_value)
+            send(lock_col + '=', previous_lock_value)
             raise
           end
         end
 
-  def destroy_with_lock #:nodoc:
-    return destroy_without_lock unless locking_enabled?
+        def destroy #:nodoc:
+          return super unless locking_enabled?
 
-    unless new_record?
-      lock_col = self.class.locking_column
-      previous_value = send(lock_col).to_i
+          if persisted?
+            table = self.class.arel_table
+            lock_col = self.class.locking_column
+            predicate = table[self.class.primary_key].eq(id).
+              and(table[lock_col].eq(send(lock_col).to_i))
 
-      affected_rows = connection.delete(
-        "DELETE FROM #{self.class.quoted_table_name} " +
-        "WHERE #{connection.quote_column_name(self.class.primary_key)} = #{quoted_id} " +
-              "AND #{self.class.quoted_locking_column} = #{quote_value(previous_value)}",
-        "#{self.class.name} Destroy"
-      )
+            affected_rows = self.class.unscoped.where(predicate).delete_all
 
-      unless affected_rows == 1
-        raise ActiveRecord::StaleObjectError, "Attempted to delete a stale object"
-      end
-    end
+            unless affected_rows == 1
+              raise ActiveRecord::StaleObjectError, "Attempted to delete a stale object: #{self.class.name}"
+            end
+          end
 
-    freeze
-  end
+          @destroyed = true
+          freeze
+        end
 
       module ClassMethods
         DEFAULT_LOCKING_COLUMN = 'lock_version'
-
-        def self.extended(base)
-          class <<base
-            alias_method_chain :update_counters, :lock
-          end
-        end
 
         # Is optimistic locking enabled for this table? Returns true if the
         # +lock_optimistically+ flag is set to true (which it is, by default)
@@ -171,9 +168,9 @@ module ActiveRecord
 
         # Make sure the lock version column gets updated when counters are
         # updated.
-        def update_counters_with_lock(id, counters)
+        def update_counters(id, counters)
           counters = counters.merge(locking_column => 1) if locking_enabled?
-          update_counters_without_lock(id, counters)
+          super
         end
       end
     end

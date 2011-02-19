@@ -4,10 +4,43 @@ require 'abstract_unit'
 require 'inflector_test_cases'
 
 require 'active_support/core_ext/string'
-require 'active_support/core_ext/time'
+require 'active_support/time'
+require 'active_support/core_ext/kernel/reporting'
+require 'active_support/core_ext/string/strip'
 
 class StringInflectionsTest < Test::Unit::TestCase
   include InflectorTestCases
+
+  def test_strip_heredoc_on_an_empty_string
+    assert_equal '', ''.strip_heredoc
+  end
+
+  def test_strip_heredoc_on_a_string_with_no_lines
+    assert_equal 'x', 'x'.strip_heredoc
+    assert_equal 'x', '    x'.strip_heredoc
+  end
+
+  def test_strip_heredoc_on_a_heredoc_with_no_margin
+    assert_equal "foo\nbar", "foo\nbar".strip_heredoc
+    assert_equal "foo\n  bar", "foo\n  bar".strip_heredoc
+  end
+
+  def test_strip_heredoc_on_a_regular_indented_heredoc
+    assert_equal "foo\n  bar\nbaz\n", <<-EOS.strip_heredoc
+      foo
+        bar
+      baz
+    EOS
+  end
+
+  def test_strip_heredoc_on_a_regular_indented_heredoc_with_blank_lines
+    assert_equal "foo\n  bar\n\nbaz\n", <<-EOS.strip_heredoc
+      foo
+        bar
+
+      baz
+    EOS
+  end
 
   def test_pluralize
     SingularToPlural.each do |singular, plural|
@@ -109,21 +142,35 @@ class StringInflectionsTest < Test::Unit::TestCase
     assert_equal 97, 'abc'.ord
   end
 
+  if RUBY_VERSION < '1.9'
+    def test_getbyte
+      assert_equal 97, 'a'.getbyte(0)
+      assert_equal 99, 'abc'.getbyte(2)
+      assert_nil   'abc'.getbyte(3)
+    end
+  end
+
   def test_string_to_time
     assert_equal Time.utc(2005, 2, 27, 23, 50), "2005-02-27 23:50".to_time
     assert_equal Time.local(2005, 2, 27, 23, 50), "2005-02-27 23:50".to_time(:local)
+    assert_equal Time.utc(2005, 2, 27, 23, 50, 19, 275038), "2005-02-27T23:50:19.275038".to_time
+    assert_equal Time.local(2005, 2, 27, 23, 50, 19, 275038), "2005-02-27T23:50:19.275038".to_time(:local)
     assert_equal DateTime.civil(2039, 2, 27, 23, 50), "2039-02-27 23:50".to_time
     assert_equal Time.local_time(2039, 2, 27, 23, 50), "2039-02-27 23:50".to_time(:local)
+    assert_nil "".to_time
   end
-  
+
   def test_string_to_datetime
     assert_equal DateTime.civil(2039, 2, 27, 23, 50), "2039-02-27 23:50".to_datetime
     assert_equal 0, "2039-02-27 23:50".to_datetime.offset # use UTC offset
     assert_equal ::Date::ITALY, "2039-02-27 23:50".to_datetime.start # use Ruby's default start value
+    assert_equal DateTime.civil(2039, 2, 27, 23, 50, 19 + Rational(275038, 1000000), "-04:00"), "2039-02-27T23:50:19.275038-04:00".to_datetime
+    assert_nil "".to_datetime
   end
-  
+
   def test_string_to_date
     assert_equal Date.new(2005, 2, 27), "2005-02-27".to_date
+    assert_nil "".to_date
   end
 
   def test_access
@@ -182,17 +229,9 @@ class StringInflectionsTest < Test::Unit::TestCase
     assert s.starts_with?('hel')
     assert !s.starts_with?('el')
 
-    assert s.start_with?('h')
-    assert s.start_with?('hel')
-    assert !s.start_with?('el')
-
     assert s.ends_with?('o')
     assert s.ends_with?('lo')
     assert !s.ends_with?('el')
-
-    assert s.end_with?('o')
-    assert s.end_with?('lo')
-    assert !s.end_with?('el')
   end
 
   def test_string_squish
@@ -212,14 +251,32 @@ class StringInflectionsTest < Test::Unit::TestCase
     assert_equal original, expected
   end
 
-  if RUBY_VERSION < '1.9'
-    def test_each_char_with_utf8_string_when_kcode_is_utf8
-      with_kcode('UTF8') do
-        '€2.99'.each_char do |char|
-          assert_not_equal 1, char.length
-          break
-        end
+  def test_truncate
+    assert_equal "Hello World!", "Hello World!".truncate(12)
+    assert_equal "Hello Wor...", "Hello World!!".truncate(12)
+  end
+
+  def test_truncate_with_omission_and_seperator
+    assert_equal "Hello[...]", "Hello World!".truncate(10, :omission => "[...]")
+    assert_equal "Hello[...]", "Hello Big World!".truncate(13, :omission => "[...]", :separator => ' ')
+    assert_equal "Hello Big[...]", "Hello Big World!".truncate(14, :omission => "[...]", :separator => ' ')
+    assert_equal "Hello Big[...]", "Hello Big World!".truncate(15, :omission => "[...]", :separator => ' ')
+  end
+
+  if RUBY_VERSION < '1.9.0'
+    def test_truncate_multibyte
+      with_kcode 'none' do
+        assert_equal "\354\225\210\353\205\225\355...", "\354\225\210\353\205\225\355\225\230\354\204\270\354\232\224".truncate(10)
       end
+      with_kcode 'u' do
+        assert_equal "\354\225\204\353\246\254\353\236\221 \354\225\204\353\246\254 ...",
+          "\354\225\204\353\246\254\353\236\221 \354\225\204\353\246\254 \354\225\204\353\235\274\353\246\254\354\230\244".truncate(10)
+      end
+    end
+  else
+    def test_truncate_multibyte
+      assert_equal "\354\225\204\353\246\254\353\236\221 \354\225\204\353\246\254 ...".force_encoding('UTF-8'),
+        "\354\225\204\353\246\254\353\236\221 \354\225\204\353\246\254 \354\225\204\353\235\274\353\246\254\354\230\244".force_encoding('UTF-8').truncate(10)
     end
   end
 end
@@ -236,7 +293,7 @@ class CoreExtStringMultibyteTest < ActiveSupport::TestCase
   BYTE_STRING = "\270\236\010\210\245"
 
   def test_core_ext_adds_mb_chars
-    assert UNICODE_STRING.respond_to?(:mb_chars)
+    assert_respond_to UNICODE_STRING, :mb_chars
   end
 
   def test_string_should_recognize_utf8_strings
@@ -245,35 +302,154 @@ class CoreExtStringMultibyteTest < ActiveSupport::TestCase
     assert !BYTE_STRING.is_utf8?
   end
 
-  if RUBY_VERSION < '1.8.7'
-    def test_core_ext_adds_chars
-      assert UNICODE_STRING.respond_to?(:chars)
-    end
-
-    def test_chars_warns_about_deprecation
-      assert_deprecated("String#chars") do
-        ''.chars
-      end
-    end
-  end
-
   if RUBY_VERSION < '1.9'
     def test_mb_chars_returns_self_when_kcode_not_set
       with_kcode('none') do
-        assert UNICODE_STRING.mb_chars.kind_of?(String)
+        assert_kind_of String, UNICODE_STRING.mb_chars
       end
     end
 
     def test_mb_chars_returns_an_instance_of_the_chars_proxy_when_kcode_utf8
       with_kcode('UTF8') do
-        assert UNICODE_STRING.mb_chars.kind_of?(ActiveSupport::Multibyte.proxy_class)
+        assert_kind_of ActiveSupport::Multibyte.proxy_class, UNICODE_STRING.mb_chars
       end
     end
+  else
+    def test_mb_chars_returns_instance_of_proxy_class
+      assert_kind_of ActiveSupport::Multibyte.proxy_class, UNICODE_STRING.mb_chars
+    end
+  end
+end
+
+class OutputSafetyTest < ActiveSupport::TestCase
+  def setup
+    @string = "hello"
+    @object = Class.new(Object) do
+      def to_s
+        "other"
+      end
+    end.new
   end
 
-  if RUBY_VERSION >= '1.9'
-    def test_mb_chars_returns_string
-      assert UNICODE_STRING.mb_chars.kind_of?(String)
+  test "A string is unsafe by default" do
+    assert !@string.html_safe?
+  end
+
+  test "A string can be marked safe" do
+    string = @string.html_safe
+    assert string.html_safe?
+  end
+
+  test "Marking a string safe returns the string" do
+    assert_equal @string, @string.html_safe
+  end
+
+  test "A fixnum is safe by default" do
+    assert 5.html_safe?
+  end
+
+  test "An object is unsafe by default" do
+    assert !@object.html_safe?
+  end
+
+  test "Adding an object to a safe string returns a safe string" do
+    string = @string.html_safe
+    string << @object
+
+    assert_equal "helloother", string
+    assert string.html_safe?
+  end
+
+  test "Adding a safe string to another safe string returns a safe string" do
+    @other_string = "other".html_safe
+    string = @string.html_safe
+    @combination = @other_string + string
+
+    assert_equal "otherhello", @combination
+    assert @combination.html_safe?
+  end
+
+  test "Adding an unsafe string to a safe string escapes it and returns a safe string" do
+    @other_string = "other".html_safe
+    @combination = @other_string + "<foo>"
+    @other_combination = @string + "<foo>"
+
+    assert_equal "other&lt;foo&gt;", @combination
+    assert_equal "hello<foo>", @other_combination
+
+    assert @combination.html_safe?
+    assert !@other_combination.html_safe?
+  end
+
+  test "Concatting safe onto unsafe yields unsafe" do
+    @other_string = "other"
+
+    string = @string.html_safe
+    @other_string.concat(string)
+    assert !@other_string.html_safe?
+  end
+
+  test "Concatting unsafe onto safe yields escaped safe" do
+    @other_string = "other".html_safe
+    string = @other_string.concat("<foo>")
+    assert_equal "other&lt;foo&gt;", string
+    assert string.html_safe?
+  end
+
+  test "Concatting safe onto safe yields safe" do
+    @other_string = "other".html_safe
+    string = @string.html_safe
+
+    @other_string.concat(string)
+    assert @other_string.html_safe?
+  end
+
+  test "Concatting safe onto unsafe with << yields unsafe" do
+    @other_string = "other"
+    string = @string.html_safe
+
+    @other_string << string
+    assert !@other_string.html_safe?
+  end
+
+  test "Concatting unsafe onto safe with << yields escaped safe" do
+    @other_string = "other".html_safe
+    string = @other_string << "<foo>"
+    assert_equal "other&lt;foo&gt;", string
+    assert string.html_safe?
+  end
+
+  test "Concatting safe onto safe with << yields safe" do
+    @other_string = "other".html_safe
+    string = @string.html_safe
+
+    @other_string << string
+    assert @other_string.html_safe?
+  end
+
+  test "Concatting a fixnum to safe always yields safe" do
+    string = @string.html_safe
+    string = string.concat(13)
+    assert_equal "hello".concat(13), string
+    assert string.html_safe?
+  end
+
+  test 'emits normal string yaml' do
+    assert_equal 'foo'.to_yaml, 'foo'.html_safe.to_yaml(:foo => 1)
+  end
+
+  test 'knows whether it is encoding aware' do
+    if RUBY_VERSION >= "1.9"
+      assert 'ruby'.encoding_aware?
+    else
+      assert !'ruby'.encoding_aware?
     end
+  end
+end
+
+class StringExcludeTest < ActiveSupport::TestCase
+  test 'inverse of #include' do
+    assert_equal false, 'foo'.exclude?('o')
+    assert_equal true, 'foo'.exclude?('p')
   end
 end

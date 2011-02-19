@@ -1,11 +1,31 @@
 require 'set'
+require 'active_support/core_ext/class/attribute_accessors'
+require 'active_support/core_ext/object/blank'
 
 module Mime
-  SET              = []
-  EXTENSION_LOOKUP = Hash.new { |h, k| h[k] = Type.new(k) unless k.blank? }
+  class Mimes < Array
+    def symbols
+      @symbols ||= map {|m| m.to_sym }
+    end
+
+    %w(<< concat shift unshift push pop []= clear compact! collect!
+    delete delete_at delete_if flatten! map! insert reject! reverse!
+    replace slice! sort! uniq!).each do |method|
+      module_eval <<-CODE, __FILE__, __LINE__ + 1
+        def #{method}(*)
+          @symbols = nil
+          super
+        end
+      CODE
+    end
+  end
+
+  SET              = Mimes.new
+  EXTENSION_LOOKUP = {}
   LOOKUP           = Hash.new { |h, k| h[k] = Type.new(k) unless k.blank? }
 
   def self.[](type)
+    return type if type.is_a?(Type)
     Type.lookup_by_extension(type.to_s)
   end
 
@@ -33,12 +53,6 @@ module Mime
     cattr_reader :browser_generated_types
     attr_reader :symbol
 
-    @@unverifiable_types = Set.new [:text, :json, :csv, :xml, :rss, :atom, :yaml]
-    def self.unverifiable_types
-      ActiveSupport::Deprecation.warn("unverifiable_types is deprecated and has no effect", caller)
-      @@unverifiable_types
-    end
-
     # A simple helper class used in parsing the accept header
     class AcceptItem #:nodoc:
       attr_accessor :order, :name, :q
@@ -46,7 +60,7 @@ module Mime
       def initialize(order, name, q=nil)
         @order = order
         @name = name.strip
-        q ||= 0.0 if @name == Mime::ALL # default wilcard match to end of list
+        q ||= 0.0 if @name == Mime::ALL # default wildcard match to end of list
         @q = ((q || 1.0).to_f * 100).to_i
       end
 
@@ -66,12 +80,15 @@ module Mime
     end
 
     class << self
+
+      TRAILING_STAR_REGEXP = /(text|application)\/\*/
+
       def lookup(string)
         LOOKUP[string]
       end
 
       def lookup_by_extension(extension)
-        EXTENSION_LOOKUP[extension]
+        EXTENSION_LOOKUP[extension.to_s]
       end
 
       # Registers an alias that's not used on mime type lookup, but can be referenced directly. Especially useful for
@@ -81,25 +98,38 @@ module Mime
       end
 
       def register(string, symbol, mime_type_synonyms = [], extension_synonyms = [], skip_lookup = false)
-        Mime.instance_eval { const_set symbol.to_s.upcase, Type.new(string, symbol, mime_type_synonyms) }
+        Mime.const_set(symbol.to_s.upcase, Type.new(string, symbol, mime_type_synonyms))
 
         SET << Mime.const_get(symbol.to_s.upcase)
 
-        ([string] + mime_type_synonyms).each { |string| LOOKUP[string] = SET.last } unless skip_lookup
+        ([string] + mime_type_synonyms).each { |str| LOOKUP[str] = SET.last } unless skip_lookup
         ([symbol.to_s] + extension_synonyms).each { |ext| EXTENSION_LOOKUP[ext] = SET.last }
       end
 
       def parse(accept_header)
         if accept_header !~ /,/
-          [Mime::Type.lookup(accept_header)]
+          if accept_header =~ TRAILING_STAR_REGEXP
+            parse_data_with_trailing_star($1)
+          else
+            [Mime::Type.lookup(accept_header)]
+          end
         else
           # keep track of creation order to keep the subsequent sort stable
-          list = []
-          accept_header.split(/,/).each_with_index do |header, index| 
-            params, q = header.split(/;\s*q=/)       
-            if params
-              params.strip!          
-              list << AcceptItem.new(index, params, q) unless params.empty?
+          list, index = [], 0
+          accept_header.split(/,/).each do |header|
+            params, q = header.split(/;\s*q=/)
+            if params.present?
+              params.strip!
+
+              if params =~ TRAILING_STAR_REGEXP
+                parse_data_with_trailing_star($1).each do |m|
+                  list << AcceptItem.new(index, m.to_s, q)
+                  index += 1
+                end
+              else
+                list << AcceptItem.new(index, params, q)
+                index += 1
+              end
             end
           end
           list.sort!
@@ -146,23 +176,51 @@ module Mime
           list
         end
       end
+
+      # input: 'text'
+      # returned value:  [Mime::JSON, Mime::XML, Mime::ICS, Mime::HTML, Mime::CSS, Mime::CSV, Mime::JS, Mime::YAML, Mime::TEXT]
+      #
+      # input: 'application'
+      # returned value: [Mime::HTML, Mime::JS, Mime::XML, Mime::YAML, Mime::ATOM, Mime::JSON, Mime::RSS, Mime::URL_ENCODED_FORM]
+      def parse_data_with_trailing_star(input)
+        Mime::SET.select { |m| m =~ input }
+      end
+
+      # This method is opposite of register method.
+      #
+      # Usage:
+      #
+      # Mime::Type.unregister(:mobile)
+      def unregister(symbol)
+        symbol = symbol.to_s.upcase
+        mime = Mime.const_get(symbol)
+        Mime.instance_eval { remove_const(symbol) }
+
+        SET.delete_if { |v| v.eql?(mime) }
+        LOOKUP.delete_if { |k,v| v.eql?(mime) }
+        EXTENSION_LOOKUP.delete_if { |k,v| v.eql?(mime) }
+      end
     end
-    
+
     def initialize(string, symbol = nil, synonyms = [])
       @symbol, @synonyms = symbol, synonyms
       @string = string
     end
-    
+
     def to_s
       @string
     end
-    
+
     def to_str
       to_s
     end
-    
+
     def to_sym
-      @symbol || @string.to_sym
+      @symbol
+    end
+
+    def ref
+      to_sym || to_s
     end
 
     def ===(list)
@@ -172,11 +230,11 @@ module Mime
         super
       end
     end
-    
+
     def ==(mime_type)
       return false if mime_type.blank?
-      (@synonyms + [ self ]).any? do |synonym| 
-        synonym.to_s == mime_type.to_s || synonym.to_sym == mime_type.to_sym 
+      (@synonyms + [ self ]).any? do |synonym|
+        synonym.to_s == mime_type.to_s || synonym.to_sym == mime_type.to_sym
       end
     end
 

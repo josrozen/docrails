@@ -20,9 +20,9 @@ class ViewLoadPathsTest < ActionController::TestCase
     layout 'test/sub'
     def hello_world; render(:template => 'test/hello_world'); end
   end
-  
+
   def setup
-    TestController.view_paths = nil
+    # TestController.view_paths = nil
 
     @request  = ActionController::TestRequest.new
     @response = ActionController::TestResponse.new
@@ -36,19 +36,22 @@ class ViewLoadPathsTest < ActionController::TestCase
     @old_behavior = ActiveSupport::Deprecation.behavior
     @last_message = nil
     ActiveSupport::Deprecation.behavior = Proc.new { |message, callback| @last_message = message }
+
+    @paths = TestController.view_paths
   end
 
   def teardown
+    TestController.view_paths = @paths
     ActiveSupport::Deprecation.behavior = @old_behavior
   end
 
   def expand(array)
-    array.map {|x| File.expand_path(x)}
+    array.map {|x| File.expand_path(x.to_s)}
   end
 
   def assert_paths(*paths)
     controller = paths.first.is_a?(Class) ? paths.shift : @controller
-    assert_equal expand(paths), controller.view_paths.map(&:to_s)
+    assert_equal expand(paths), controller.view_paths.map { |p| p.to_s }
   end
 
   def test_template_load_path_was_set_correctly
@@ -61,7 +64,7 @@ class ViewLoadPathsTest < ActionController::TestCase
 
     @controller.append_view_path(%w(bar baz))
     assert_paths(FIXTURE_LOAD_PATH, "foo", "bar", "baz")
-    
+
     @controller.append_view_path(FIXTURE_LOAD_PATH)
     assert_paths(FIXTURE_LOAD_PATH, "foo", "bar", "baz", FIXTURE_LOAD_PATH)
   end
@@ -142,9 +145,9 @@ class ViewLoadPathsTest < ActionController::TestCase
     assert_paths A, "a/path"
     assert_paths A, *B.view_paths
     assert_paths C, *original_load_paths
-    
+
     C.view_paths = []
-    assert_nothing_raised { C.view_paths << 'c/path' }
+    assert_nothing_raised { C.append_view_path 'c/path' }
     assert_paths C, "c/path"
   end
 end

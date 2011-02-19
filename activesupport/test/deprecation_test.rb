@@ -25,6 +25,9 @@ class Deprecatee
   def e; end
   deprecate :a, :b, :c => :e, :d => "you now need to do something extra for this one"
 
+  def f=(v); end
+  deprecate :f=
+
   module B
     C = 1
   end
@@ -59,7 +62,7 @@ class DeprecationTest < ActiveSupport::TestCase
   end
 
   def test_deprecate_class_method
-    assert_deprecated(/none is deprecated.*test_deprecate_class_method at/) do
+    assert_deprecated(/none is deprecated.*test_deprecate_class_method/) do
       assert_equal 1, @dtc.none
     end
 
@@ -75,6 +78,19 @@ class DeprecationTest < ActiveSupport::TestCase
   def test_nil_behavior_is_ignored
     ActiveSupport::Deprecation.behavior = nil
     assert_deprecated(/foo=nil/) { @dtc.partially }
+  end
+
+  def test_several_behaviors
+    @a, @b = nil, nil
+
+    ActiveSupport::Deprecation.behavior = [
+      Proc.new { |msg, callstack| @a = msg },
+      Proc.new { |msg, callstack| @b = msg }
+    ]
+
+    @dtc.partially
+    assert_match(/foo=nil/, @a)
+    assert_match(/foo=nil/, @b)
   end
 
   def test_deprecated_instance_variable_proxy
@@ -120,6 +136,13 @@ class DeprecationTest < ActiveSupport::TestCase
     assert_equal 123, result
   end
 
+  def test_assert_deprecated_warn_work_with_default_behavior
+    ActiveSupport::Deprecation.instance_variable_set('@behavior' , nil)
+    assert_deprecated('abc') do
+      ActiveSupport::Deprecation.warn 'abc'
+    end
+  end
+
   def test_silence
     ActiveSupport::Deprecation.silence do
       assert_not_deprecated { @dtc.partially }
@@ -133,6 +156,7 @@ class DeprecationTest < ActiveSupport::TestCase
   def test_deprecation_without_explanation
     assert_deprecated { @dtc.a }
     assert_deprecated { @dtc.b }
+    assert_deprecated { @dtc.f = :foo }
   end
 
   def test_deprecation_with_alternate_method

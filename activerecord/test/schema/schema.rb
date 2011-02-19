@@ -1,4 +1,3 @@
-
 ActiveRecord::Schema.define do
   def except(adapter_names_to_exclude)
     unless [adapter_names_to_exclude].flatten.include?(adapter_name)
@@ -19,11 +18,26 @@ ActiveRecord::Schema.define do
   end
 
 
-  # Please keep these create table statements in alphabetical order
-  # unless the ordering matters.  In which case, define them below
+  # ------------------------------------------------------------------- #
+  #                                                                     #
+  #   Please keep these create table statements in alphabetical order   #
+  #   unless the ordering matters.  In which case, define them below.   #
+  #                                                                     #
+  # ------------------------------------------------------------------- #
+
   create_table :accounts, :force => true do |t|
     t.integer :firm_id
+    t.string  :firm_name
     t.integer :credit_limit
+  end
+
+  create_table :admin_accounts, :force => true do |t|
+    t.string :name
+  end
+
+  create_table :admin_users, :force => true do |t|
+    t.string :name
+    t.references :account
   end
 
   create_table :audit_logs, :force => true do |t|
@@ -45,7 +59,6 @@ ActiveRecord::Schema.define do
     t.column :favorite_author_id, :integer
   end
 
-
   create_table :auto_id_tests, :force => true, :id => false do |t|
     t.primary_key :auto_id
     t.integer     :value
@@ -57,6 +70,7 @@ ActiveRecord::Schema.define do
 
   create_table :birds, :force => true do |t|
     t.string :name
+    t.string :color
     t.integer :pirate_id
   end
 
@@ -64,12 +78,23 @@ ActiveRecord::Schema.define do
     t.column :name, :string
   end
 
-  create_table :booleantests, :force => true do |t|
+  create_table :booleans, :force => true do |t|
     t.boolean :value
+  end
+
+  create_table :bulbs, :force => true do |t|
+    t.integer :car_id
+    t.string  :name
   end
 
   create_table "CamelCase", :force => true do |t|
     t.string :name
+  end
+
+  create_table :cars, :force => true do |t|
+    t.string  :name
+    t.integer :engines_count
+    t.integer :wheels_count
   end
 
   create_table :categories, :force => true do |t|
@@ -85,8 +110,10 @@ ActiveRecord::Schema.define do
 
   create_table :categorizations, :force => true do |t|
     t.column :category_id, :integer
+    t.string :named_category_name
     t.column :post_id, :integer
     t.column :author_id, :integer
+    t.column :special, :boolean
   end
 
   create_table :citations, :force => true do |t|
@@ -98,14 +125,25 @@ ActiveRecord::Schema.define do
     t.string :name
   end
 
+  create_table :collections, :force => true do |t|
+    t.string :name
+  end
+
   create_table :colnametests, :force => true do |t|
     t.integer :references, :null => false
   end
 
   create_table :comments, :force => true do |t|
     t.integer :post_id, :null => false
-    t.text    :body, :null => false
+    # use VARCHAR2(4000) instead of CLOB datatype as CLOB data type has many limitations in
+    # Oracle SELECT WHERE clause which causes many unit test failures
+    if current_adapter?(:OracleAdapter)
+      t.string  :body, :null => false, :limit => 4000
+    else
+      t.text    :body, :null => false
+    end
     t.string  :type
+    t.integer :taggings_count, :default => 0
   end
 
   create_table :companies, :force => true do |t|
@@ -116,6 +154,7 @@ ActiveRecord::Schema.define do
     t.string  :name
     t.integer :client_of
     t.integer :rating, :default => 1
+    t.integer :account_id
   end
 
   add_index :companies, [:firm_id, :type, :rating, :ruby_type], :name => "company_index"
@@ -125,6 +164,10 @@ ActiveRecord::Schema.define do
     t.integer :extendedWarranty, :null => false
   end
 
+  create_table :contracts, :force => true do |t|
+    t.integer :developer_id
+    t.integer :company_id
+  end
 
   create_table :customers, :force => true do |t|
     t.string  :name
@@ -133,6 +176,11 @@ ActiveRecord::Schema.define do
     t.string  :address_city
     t.string  :address_country
     t.string  :gps_location
+  end
+
+  create_table :dashboards, :force => true, :id => false do |t|
+    t.string :dashboard_id
+    t.string :name
   end
 
   create_table :developers, :force => true do |t|
@@ -149,23 +197,39 @@ ActiveRecord::Schema.define do
     t.integer :access_level, :default => 1
   end
 
-  create_table :edges, :force => true do |t|
+  create_table :edges, :force => true, :id => false do |t|
     t.column :source_id, :integer, :null => false
     t.column :sink_id,   :integer, :null => false
   end
   add_index :edges, [:source_id, :sink_id], :unique => true, :name => 'unique_edge_index'
 
+  create_table :engines, :force => true do |t|
+    t.integer :car_id
+  end
 
   create_table :entrants, :force => true do |t|
     t.string  :name, :null => false
     t.integer :course_id, :null => false
   end
 
+  create_table :essays, :force => true do |t|
+    t.string :name
+    t.string :writer_id
+    t.string :writer_type
+  end
+
   create_table :events, :force => true do |t|
     t.string :title, :limit => 5
   end
 
+  create_table :eyes, :force => true do |t|
+  end
+
   create_table :funny_jokes, :force => true do |t|
+    t.string :name
+  end
+
+  create_table :cold_jokes, :force => true do |t|
     t.string :name
   end
 
@@ -174,8 +238,8 @@ ActiveRecord::Schema.define do
     t.string :info
   end
 
-  create_table :items, :force => true do |t|
-    t.column :name, :integer
+  create_table :guids, :force => true do |t|
+    t.column :key, :string
   end
 
   create_table :inept_wizards, :force => true do |t|
@@ -184,6 +248,26 @@ ActiveRecord::Schema.define do
     t.column :type, :string
   end
 
+  create_table :integer_limits, :force => true do |t|
+    t.integer :"c_int_without_limit"
+    (1..8).each do |i|
+      t.integer :"c_int_#{i}", :limit => i
+    end
+  end
+
+  create_table :invoices, :force => true do |t|
+    t.integer :balance
+    t.datetime :updated_at
+  end
+
+  create_table :iris, :force => true do |t|
+    t.references :eye
+    t.string     :color
+  end
+
+  create_table :items, :force => true do |t|
+    t.column :name, :string
+  end
 
   create_table :jobs, :force => true do |t|
     t.integer :ideal_reference_id
@@ -197,6 +281,20 @@ ActiveRecord::Schema.define do
   create_table :legacy_things, :force => true do |t|
     t.integer :tps_report_number
     t.integer :version, :null => false, :default => 0
+  end
+
+  create_table :lessons, :force => true do |t|
+    t.string :name
+  end
+
+  create_table :lessons_students, :id => false, :force => true do |t|
+    t.references :lesson
+    t.references :student
+  end
+
+  create_table :line_items, :force => true do |t|
+    t.integer :invoice_id
+    t.integer :amount
   end
 
   create_table :lock_without_defaults, :force => true do |t|
@@ -235,11 +333,11 @@ ActiveRecord::Schema.define do
     t.string :name
   end
 
-  create_table :references, :force => true do |t|
-    t.integer :person_id
-    t.integer :job_id
-    t.boolean :favourite
-    t.integer :lock_version, :default => 0
+  create_table :minivans, :force => true, :id => false do |t|
+    t.string :minivan_id
+    t.string :name
+    t.string :speedometer_id
+    t.string :color
   end
 
   create_table :minimalistics, :force => true do |t|
@@ -273,6 +371,12 @@ ActiveRecord::Schema.define do
     t.decimal :my_house_population, :precision => 2, :scale => 0
     t.decimal :decimal_number_with_default, :precision => 3, :scale => 2, :default => 2.78
     t.float   :temperature
+    # Oracle/SQLServer supports precision up to 38
+    if current_adapter?(:OracleAdapter,:SQLServerAdapter)
+      t.decimal :atoms_in_universe, :precision => 38, :scale => 0
+    else
+      t.decimal :atoms_in_universe, :precision => 55, :scale => 0
+    end
   end
 
   create_table :orders, :force => true do |t|
@@ -290,7 +394,6 @@ ActiveRecord::Schema.define do
     t.column :updated_at, :datetime
     t.column :happy_at,   :datetime
   end
-
 
   create_table :paint_colors, :force => true do |t|
     t.integer :non_poly_one_id
@@ -324,12 +427,16 @@ ActiveRecord::Schema.define do
     t.string     :first_name, :null => false
     t.references :primary_contact
     t.string     :gender, :limit => 1
+    t.references :number1_fan
     t.integer    :lock_version, :null => false, :default => 0
+    t.string     :comments
+    t.timestamps
   end
 
   create_table :pets, :primary_key => :pet_id ,:force => true do |t|
     t.string :name
     t.integer :owner_id, :integer
+    t.timestamps
   end
 
   create_table :pirates, :force => true do |t|
@@ -342,16 +449,32 @@ ActiveRecord::Schema.define do
   create_table :posts, :force => true do |t|
     t.integer :author_id
     t.string  :title, :null => false
-    t.text    :body, :null => false
+    # use VARCHAR2(4000) instead of CLOB datatype as CLOB data type has many limitations in
+    # Oracle SELECT WHERE clause which causes many unit test failures
+    if current_adapter?(:OracleAdapter)
+      t.string  :body, :null => false, :limit => 4000
+    else
+      t.text    :body, :null => false
+    end
     t.string  :type
     t.integer :comments_count, :default => 0
     t.integer :taggings_count, :default => 0
+    t.integer :taggings_with_delete_all_count, :default => 0
+    t.integer :taggings_with_destroy_count, :default => 0
+    t.integer :tags_count, :default => 0
+    t.integer :tags_with_destroy_count, :default => 0
+    t.integer :tags_with_nullify_count, :default => 0
   end
 
   create_table :price_estimates, :force => true do |t|
     t.string :estimate_of_type
     t.integer :estimate_of_id
     t.integer :price
+  end
+
+  create_table :products, :force => true do |t|
+    t.references :collection
+    t.string     :name
   end
 
   create_table :projects, :force => true do |t|
@@ -362,6 +485,14 @@ ActiveRecord::Schema.define do
   create_table :readers, :force => true do |t|
     t.integer :post_id, :null => false
     t.integer :person_id, :null => false
+    t.boolean :skimmer, :default => false
+  end
+
+  create_table :references, :force => true do |t|
+    t.integer :person_id
+    t.integer :job_id
+    t.boolean :favourite
+    t.integer :lock_version, :default => 0
   end
 
   create_table :shape_expressions, :force => true do |t|
@@ -385,10 +516,20 @@ ActiveRecord::Schema.define do
     t.integer :ship_id
   end
 
+  create_table :speedometers, :force => true, :id => false do |t|
+    t.string :speedometer_id
+    t.string :name
+    t.string :dashboard_id
+  end
+
   create_table :sponsors, :force => true do |t|
     t.integer :club_id
     t.integer :sponsorable_id
     t.string :sponsorable_type
+  end
+
+  create_table :students, :force => true do |t|
+    t.string :name
   end
 
   create_table :subscribers, :force => true, :id => false do |t|
@@ -400,6 +541,18 @@ ActiveRecord::Schema.define do
   create_table :subscriptions, :force => true do |t|
     t.string :subscriber_id
     t.integer :book_id
+  end
+
+  create_table :tags, :force => true do |t|
+    t.column :name, :string
+    t.column :taggings_count, :integer, :default => 0
+  end
+
+  create_table :taggings, :force => true do |t|
+    t.column :tag_id, :integer
+    t.column :super_tag_id, :integer
+    t.column :taggable_type, :string
+    t.column :taggable_id, :integer
   end
 
   create_table :tasks, :force => true do |t|
@@ -414,34 +567,48 @@ ActiveRecord::Schema.define do
     t.datetime :written_on
     t.time     :bonus_time
     t.date     :last_read
-    t.text     :content
+    # use VARCHAR2(4000) instead of CLOB datatype as CLOB data type has many limitations in
+    # Oracle SELECT WHERE clause which causes many unit test failures
+    if current_adapter?(:OracleAdapter)
+      t.string   :content, :limit => 4000
+    else
+      t.text     :content
+    end
     t.boolean  :approved, :default => true
     t.integer  :replies_count, :default => 0
     t.integer  :parent_id
+    t.string   :parent_title
     t.string   :type
-  end
-
-  create_table :taggings, :force => true do |t|
-    t.column :tag_id, :integer
-    t.column :super_tag_id, :integer
-    t.column :taggable_type, :string
-    t.column :taggable_id, :integer
-  end
-
-  create_table :tags, :force => true do |t|
-    t.column :name, :string
-    t.column :taggings_count, :integer, :default => 0
+    t.string   :group
+    t.timestamps
   end
 
   create_table :toys, :primary_key => :toy_id ,:force => true do |t|
     t.string :name
     t.integer :pet_id, :integer
+    t.timestamps
+  end
+
+  create_table :traffic_lights, :force => true do |t|
+    t.string   :location
+    t.string   :state
+    t.datetime :created_at
+    t.datetime :updated_at
   end
 
   create_table :treasures, :force => true do |t|
     t.column :name, :string
     t.column :looter_id, :integer
     t.column :looter_type, :string
+  end
+
+  create_table :tyres, :force => true do |t|
+    t.integer :car_id
+  end
+
+  create_table :variants, :force => true do |t|
+    t.references :product
+    t.string     :name
   end
 
   create_table :vertices, :force => true do |t|
@@ -456,15 +623,59 @@ ActiveRecord::Schema.define do
     create_table(t, :force => true) { }
   end
 
-  create_table :guids, :force => true do |t|
-    t.column :key, :string
+  # NOTE - the following 4 tables are used by models that have :inverse_of options on the associations
+  create_table :men, :force => true do |t|
+    t.string  :name
   end
 
-  create_table :integer_limits, :force => true do |t|
-    t.integer :"c_int_without_limit"
-    (1..8).each do |i|
-      t.integer :"c_int_#{i}", :limit => i
-    end
+  create_table :faces, :force => true do |t|
+    t.string  :description
+    t.integer :man_id
+    t.integer :polymorphic_man_id
+    t.string :polymorphic_man_type
+  end
+
+  create_table :interests, :force => true do |t|
+    t.string :topic
+    t.integer :man_id
+    t.integer :polymorphic_man_id
+    t.string :polymorphic_man_type
+    t.integer :zine_id
+  end
+
+  create_table :wheels, :force => true do |t|
+    t.references :wheelable, :polymorphic => true
+  end
+
+  create_table :zines, :force => true do |t|
+    t.string :title
+  end
+
+  create_table :countries, :force => true, :id => false, :primary_key => 'country_id' do |t|
+    t.string :country_id
+    t.string :name
+  end
+  create_table :treaties, :force => true, :id => false, :primary_key => 'treaty_id' do |t|
+    t.string :treaty_id
+    t.string :name
+  end
+  create_table :countries_treaties, :force => true, :id => false do |t|
+    t.string :country_id, :null => false
+    t.string :treaty_id, :null => false
+    t.datetime :created_at
+    t.datetime :updated_at
+  end
+
+  create_table :liquid, :force => true do |t|
+    t.string :name
+  end
+  create_table :molecules, :force => true do |t|
+    t.integer :liquid_id
+    t.string :name
+  end
+  create_table :electrons, :force => true do |t|
+    t.integer :molecule_id
+    t.string :name
   end
 
   except 'SQLite' do
@@ -478,4 +689,8 @@ ActiveRecord::Schema.define do
 
     execute "ALTER TABLE fk_test_has_fk ADD CONSTRAINT fk_name FOREIGN KEY (#{quote_column_name 'fk_id'}) REFERENCES #{quote_table_name 'fk_test_has_pk'} (#{quote_column_name 'id'})"
   end
+end
+
+Course.connection.create_table :courses, :force => true do |t|
+  t.column :name, :string, :null => false
 end

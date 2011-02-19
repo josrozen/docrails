@@ -1,16 +1,18 @@
 require 'set'
 
-# Adds easy defaults to writing Atom feeds with the Builder template engine (this does not work on ERb or any other
-# template languages).
 module ActionView
+  # = Action View Atom Feed Helpers
   module Helpers #:nodoc:
     module AtomFeedHelper
+      # Adds easy defaults to writing Atom feeds with the Builder template engine (this does not work on ERb or any other
+      # template languages).
+      #
       # Full usage example:
       #
       #   config/routes.rb:
-      #     ActionController::Routing::Routes.draw do |map|
-      #       map.resources :posts
-      #       map.root :controller => "posts"
+      #     Basecamp::Application.routes.draw do
+      #       resources :posts
+      #       root :to => "posts#index"
       #     end
       #
       #   app/controllers/posts_controller.rb:
@@ -49,7 +51,7 @@ module ActionView
       # * <tt>:language</tt>: Defaults to "en-US".
       # * <tt>:root_url</tt>: The HTML alternative that this feed is doubling for. Defaults to / on the current host.
       # * <tt>:url</tt>: The URL for this feed. Defaults to the current URL.
-      # * <tt>:id</tt>: The id for this feed. Defaults to "tag:#{request.host},#{options[:schema_date]}:#{request.request_uri.split(".")[0]}"
+      # * <tt>:id</tt>: The id for this feed. Defaults to "tag:#{request.host},#{options[:schema_date]}:#{request.fullpath.split(".")[0]}"
       # * <tt>:schema_date</tt>: The date at which the tag scheme for the feed was first used. A good default is the year you
       #   created the feed. See http://feedvalidator.org/docs/error/InvalidTAG.html for more information. If not specified,
       #   2005 is used (as an "I don't care" value).
@@ -98,7 +100,7 @@ module ActionView
           options[:schema_date] = "2005" # The Atom spec copyright date
         end
 
-        xml = options[:xml] || eval("xml", block.binding)
+        xml = options.delete(:xml) || eval("xml", block.binding)
         xml.instruct!
         if options[:instruct]
           options[:instruct].each do |target,attrs|
@@ -114,7 +116,7 @@ module ActionView
         feed_opts.merge!(options).reject!{|k,v| !k.to_s.match(/^xml/)}
 
         xml.feed(feed_opts) do
-          xml.id(options[:id] || "tag:#{request.host},#{options[:schema_date]}:#{request.request_uri.split(".")[0]}")
+          xml.id(options[:id] || "tag:#{request.host},#{options[:schema_date]}:#{request.fullpath.split(".")[0]}")
           xml.link(:rel => 'alternate', :type => 'text/html', :href => options[:root_url] || (request.protocol + request.host_with_port))
           xml.link(:rel => 'self', :type => 'application/atom+xml', :href => options[:url] || request.url)
 
