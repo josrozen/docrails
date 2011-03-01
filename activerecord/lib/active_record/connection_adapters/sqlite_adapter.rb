@@ -1,47 +1,7 @@
 require 'active_record/connection_adapters/abstract_adapter'
+require 'active_support/core_ext/kernel/requires'
 
 module ActiveRecord
-  class Base
-    class << self
-      # Establishes a connection to the database that's used by all Active Record objects
-      def sqlite_connection(config) # :nodoc:
-        parse_sqlite_config!(config)
-
-        unless self.class.const_defined?(:SQLite)
-          require_library_or_gem(config[:adapter])
-
-          db = SQLite::Database.new(config[:database], 0)
-          db.show_datatypes   = "ON" if !defined? SQLite::Version
-          db.results_as_hash  = true if defined? SQLite::Version
-          db.type_translation = false
-
-          # "Downgrade" deprecated sqlite API
-          if SQLite.const_defined?(:Version)
-            ConnectionAdapters::SQLite2Adapter.new(db, logger, config)
-          else
-            ConnectionAdapters::DeprecatedSQLiteAdapter.new(db, logger, config)
-          end
-        end
-      end
-
-      private
-        def parse_sqlite_config!(config)
-          config[:database] ||= config[:dbfile]
-          # Require database.
-          unless config[:database]
-            raise ArgumentError, "No database file specified. Missing argument: database"
-          end
-
-          # Allow database path relative to RAILS_ROOT, but only if
-          # the database path is not the special path that tells
-          # Sqlite to build a database only in memory.
-          if Object.const_defined?(:RAILS_ROOT) && ':memory:' != config[:database]
-            config[:database] = File.expand_path(config[:database], RAILS_ROOT)
-          end
-        end
-    end
-  end
-
   module ConnectionAdapters #:nodoc:
     class SQLiteColumn < Column #:nodoc:
       class <<  self
@@ -55,6 +15,10 @@ module ActiveRecord
         end
 
         def binary_to_string(value)
+          if value.respond_to?(:force_encoding) && value.encoding != Encoding::ASCII_8BIT
+            value = value.force_encoding(Encoding::ASCII_8BIT)
+          end
+
           value.gsub(/%00|%25/n) do |b|
             case b
               when "%00" then "\0"
@@ -65,8 +29,8 @@ module ActiveRecord
       end
     end
 
-    # The SQLite adapter works with both the 2.x and 3.x series of SQLite with the sqlite-ruby drivers (available both as gems and
-    # from http://rubyforge.org/projects/sqlite-ruby/).
+    # The SQLite adapter works with both the 2.x and 3.x series of SQLite with the sqlite-ruby
+    # drivers (available both as gems and from http://rubyforge.org/projects/sqlite-ruby/).
     #
     # Options:
     #
@@ -76,16 +40,17 @@ module ActiveRecord
         include Comparable
 
         def initialize(version_string)
-          @version = version_string.split('.').map(&:to_i)
+          @version = version_string.split('.').map { |v| v.to_i }
         end
 
         def <=>(version_string)
-          @version <=> version_string.split('.').map(&:to_i)
+          @version <=> version_string.split('.').map { |v| v.to_i }
         end
       end
 
       def initialize(connection, logger, config)
         super(connection, logger)
+        @statements = {}
         @config = config
       end
 
@@ -97,7 +62,21 @@ module ActiveRecord
         sqlite_version >= '2.0.0'
       end
 
+      def supports_savepoints?
+        sqlite_version >= '3.6.8'
+      end
+
+      # Returns +true+ when the connection adapter supports prepared statement
+      # caching, otherwise returns +false+
+      def supports_statement_cache?
+        true
+      end
+
       def supports_migrations? #:nodoc:
+        true
+      end
+
+      def supports_primary_key? #:nodoc:
         true
       end
 
@@ -108,10 +87,15 @@ module ActiveRecord
       def supports_add_column?
         sqlite_version >= '3.1.6'
       end
- 
+
       def disconnect!
         super
+        clear_cache!
         @connection.close rescue nil
+      end
+
+      def clear_cache!
+        @statements.clear
       end
 
       def supports_count_distinct? #:nodoc:
@@ -153,7 +137,7 @@ module ActiveRecord
       # Quote date/time values for use in SQL input. Includes microseconds
       # if the value is a Time responding to usec.
       def quoted_date(value) #:nodoc:
-        if value.acts_like?(:time) && value.respond_to?(:usec)
+        if value.respond_to?(:usec)
           "#{super}.#{sprintf("%06d", value.usec)}"
         else
           super
@@ -163,8 +147,34 @@ module ActiveRecord
 
       # DATABASE STATEMENTS ======================================
 
+      def exec_query(sql, name = nil, binds = [])
+        log(sql, name, binds) do
+
+          # Don't cache statements without bind values
+          if binds.empty?
+            stmt    = @connection.prepare(sql)
+            cols    = stmt.columns
+            records = stmt.to_a
+            stmt.close
+            stmt = records
+          else
+            cache = @statements[sql] ||= {
+              :stmt => @connection.prepare(sql)
+            }
+            stmt = cache[:stmt]
+            cols = cache[:cols] ||= stmt.columns
+            stmt.reset!
+            stmt.bind_params binds.map { |col, val|
+              col ? col.type_cast(val) : val
+            }
+          end
+
+          ActiveRecord::Result.new(cols, stmt.to_a)
+        end
+      end
+
       def execute(sql, name = nil) #:nodoc:
-        catch_schema_changes { log(sql, name) { @connection.execute(sql) } }
+        log(sql, name) { @connection.execute(sql) }
       end
 
       def update_sql(sql, name = nil) #:nodoc:
@@ -180,30 +190,35 @@ module ActiveRecord
       def insert_sql(sql, name = nil, pk = nil, id_value = nil, sequence_name = nil) #:nodoc:
         super || @connection.last_insert_row_id
       end
+      alias :create :insert_sql
 
       def select_rows(sql, name = nil)
-        execute(sql, name).map do |row|
-          (0...(row.size / 2)).map { |i| row[i] }
-        end
+        exec_query(sql, name).rows
+      end
+
+      def create_savepoint
+        execute("SAVEPOINT #{current_savepoint_name}")
+      end
+
+      def rollback_to_savepoint
+        execute("ROLLBACK TO SAVEPOINT #{current_savepoint_name}")
+      end
+
+      def release_savepoint
+        execute("RELEASE SAVEPOINT #{current_savepoint_name}")
       end
 
       def begin_db_transaction #:nodoc:
-        catch_schema_changes { @connection.transaction }
+        @connection.transaction
       end
 
       def commit_db_transaction #:nodoc:
-        catch_schema_changes { @connection.commit }
+        @connection.commit
       end
 
       def rollback_db_transaction #:nodoc:
-        catch_schema_changes { @connection.rollback }
+        @connection.rollback
       end
-
-      # SELECT ... FOR UPDATE is redundant since the table is locked.
-      def add_lock!(sql, options) #:nodoc:
-        sql
-      end
-
 
       # SCHEMA STATEMENTS ========================================
 
@@ -214,37 +229,51 @@ module ActiveRecord
           WHERE type = 'table' AND NOT name = 'sqlite_sequence'
         SQL
 
-        execute(sql, name).map do |row|
-          row[0]
+        exec_query(sql, name).map do |row|
+          row['name']
         end
       end
 
       def columns(table_name, name = nil) #:nodoc:
         table_structure(table_name).map do |field|
-          SQLiteColumn.new(field['name'], field['dflt_value'], field['type'], field['notnull'] == "0")
+          case field["dflt_value"]
+          when /^null$/i
+            field["dflt_value"] = nil
+          when /^'(.*)'$/
+            field["dflt_value"] = $1.gsub(/''/, "'")
+          when /^"(.*)"$/
+            field["dflt_value"] = $1.gsub(/""/, '"')
+          end
+
+          SQLiteColumn.new(field['name'], field['dflt_value'], field['type'], field['notnull'].to_i == 0)
         end
       end
 
       def indexes(table_name, name = nil) #:nodoc:
-        execute("PRAGMA index_list(#{quote_table_name(table_name)})", name).map do |row|
-          index = IndexDefinition.new(table_name, row['name'])
-          index.unique = row['unique'] != '0'
-          index.columns = execute("PRAGMA index_info('#{index.name}')").map { |col| col['name'] }
-          index
+        exec_query("PRAGMA index_list(#{quote_table_name(table_name)})", name).map do |row|
+          IndexDefinition.new(
+            table_name,
+            row['name'],
+            row['unique'] != 0,
+            exec_query("PRAGMA index_info('#{row['name']}')").map { |col|
+              col['name']
+            })
         end
       end
 
       def primary_key(table_name) #:nodoc:
-        column = table_structure(table_name).find {|field| field['pk'].to_i == 1}
-        column ? column['name'] : nil
+        column = table_structure(table_name).find { |field|
+          field['pk'] == 1
+        }
+        column && column['name']
       end
 
-      def remove_index(table_name, options={}) #:nodoc:
-        execute "DROP INDEX #{quote_column_name(index_name(table_name, options))}"
+      def remove_index!(table_name, index_name) #:nodoc:
+        exec_query "DROP INDEX #{quote_column_name(index_name)}"
       end
 
       def rename_table(name, new_name)
-        execute "ALTER TABLE #{name} RENAME TO #{new_name}"
+        exec_query "ALTER TABLE #{quote_table_name(name)} RENAME TO #{quote_table_name(new_name)}"
       end
 
       # See: http://www.sqlite.org/lang_altertable.html
@@ -264,6 +293,7 @@ module ActiveRecord
       end
 
       def remove_column(table_name, *column_names) #:nodoc:
+        raise ArgumentError.new("You must specify at least one column name.  Example: remove_column(:people, :first_name)") if column_names.empty?
         column_names.flatten.each do |column_name|
           alter_table(table_name) do |definition|
             definition.columns.delete(definition[column_name])
@@ -280,7 +310,7 @@ module ActiveRecord
 
       def change_column_null(table_name, column_name, null, default = nil)
         unless null || default.nil?
-          execute("UPDATE #{quote_table_name(table_name)} SET #{quote_column_name(column_name)}=#{quote(default)} WHERE #{quote_column_name(column_name)} IS NULL")
+          exec_query("UPDATE #{quote_table_name(table_name)} SET #{quote_column_name(column_name)}=#{quote(default)} WHERE #{quote_column_name(column_name)} IS NULL")
         end
         alter_table(table_name) do |definition|
           definition[column_name].null = null
@@ -306,27 +336,19 @@ module ActiveRecord
         alter_table(table_name, :rename => {column_name.to_s => new_column_name.to_s})
       end
 
-      def empty_insert_statement(table_name)
-        "INSERT INTO #{table_name} VALUES(NULL)"
+      def empty_insert_statement_value
+        "VALUES(NULL)"
       end
 
       protected
-        def select(sql, name = nil) #:nodoc:
-          execute(sql, name).map do |row|
-            record = {}
-            row.each_key do |key|
-              if key.is_a?(String)
-                record[key.sub(/^"?\w+"?\./, '')] = row[key]
-              end
-            end
-            record
-          end
+        def select(sql, name = nil, binds = []) #:nodoc:
+          exec_query(sql, name, binds).to_a
         end
 
         def table_structure(table_name)
-          returning structure = execute("PRAGMA table_info(#{quote_table_name(table_name)})") do
-            raise(ActiveRecord::StatementInvalid, "Could not find table '#{table_name}'") if structure.empty?
-          end
+          structure = exec_query("PRAGMA table_info(#{quote_table_name(table_name)})").to_hash
+          raise(ActiveRecord::StatementInvalid, "Could not find table '#{table_name}'") if structure.empty?
+          structure
         end
 
         def alter_table(table_name, options = {}) #:nodoc:
@@ -354,7 +376,7 @@ module ActiveRecord
                 (options[:rename][column.name] ||
                  options[:rename][column.name.to_sym] ||
                  column.name) : column.name
-              
+
               @definition.column(column_name, column.type,
                 :limit => column.limit, :default => column.default,
                 :null => column.null)
@@ -378,7 +400,7 @@ module ActiveRecord
               name = name[5..-1]
             end
 
-            to_column_names = columns(to).map(&:name)
+            to_column_names = columns(to).map { |c| c.name }
             columns = index.columns.map {|c| rename[c] || c }.select do |column|
               to_column_names.include?(column)
             end
@@ -393,29 +415,18 @@ module ActiveRecord
         end
 
         def copy_table_contents(from, to, columns, rename = {}) #:nodoc:
-          column_mappings = Hash[*columns.map {|name| [name, name]}.flatten]
-          rename.inject(column_mappings) {|map, a| map[a.last] = a.first; map}
+          column_mappings = Hash[columns.map {|name| [name, name]}]
+          rename.each { |a| column_mappings[a.last] = a.first }
           from_columns = columns(from).collect {|col| col.name}
           columns = columns.find_all{|col| from_columns.include?(column_mappings[col])}
           quoted_columns = columns.map { |col| quote_column_name(col) } * ','
 
           quoted_to = quote_table_name(to)
-          @connection.execute "SELECT * FROM #{quote_table_name(from)}" do |row|
+          exec_query("SELECT * FROM #{quote_table_name(from)}").each do |row|
             sql = "INSERT INTO #{quoted_to} (#{quoted_columns}) VALUES ("
             sql << columns.map {|col| quote row[column_mappings[col]]} * ', '
             sql << ')'
-            @connection.execute sql
-          end
-        end
-
-        def catch_schema_changes
-          return yield
-        rescue ActiveRecord::StatementInvalid => exception
-          if exception.message =~ /database schema has changed/
-            reconnect!
-            retry
-          else
-            raise
+            exec_query sql
           end
         end
 
@@ -425,24 +436,21 @@ module ActiveRecord
 
         def default_primary_key_type
           if supports_autoincrement?
-            'INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL'.freeze
+            'INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL'
           else
-            'INTEGER PRIMARY KEY NOT NULL'.freeze
+            'INTEGER PRIMARY KEY NOT NULL'
           end
         end
-    end
 
-    class SQLite2Adapter < SQLiteAdapter # :nodoc:
-      def rename_table(name, new_name)
-        move_table(name, new_name)
-      end
-    end
+        def translate_exception(exception, message)
+          case exception.message
+          when /column(s)? .* (is|are) not unique/
+            RecordNotUnique.new(message, exception)
+          else
+            super
+          end
+        end
 
-    class DeprecatedSQLiteAdapter < SQLite2Adapter # :nodoc:
-      def insert(sql, name = nil, pk = nil, id_value = nil)
-        execute(sql, name = nil)
-        id_value || @connection.last_insert_rowid
-      end
     end
   end
 end

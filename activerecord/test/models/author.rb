@@ -1,5 +1,6 @@
 class Author < ActiveRecord::Base
   has_many :posts
+  has_many :very_special_comments, :through => :posts
   has_many :posts_with_comments, :include => :comments, :class_name => "Post"
   has_many :popular_grouped_posts, :include => :comments, :class_name => "Post", :group => "type", :having => "SUM(comments_count) > 1", :select => "type"
   has_many :posts_with_comments_sorted_by_comment_id, :include => :comments, :class_name => "Post", :order => 'comments.id'
@@ -25,6 +26,12 @@ class Author < ActiveRecord::Base
   has_many :comments_with_order_and_conditions, :through => :posts, :source => :comments, :order => 'comments.body', :conditions => "comments.body like 'Thank%'"
   has_many :comments_with_include, :through => :posts, :source => :comments, :include => :post
 
+  has_many :first_posts
+  has_many :comments_on_first_posts, :through => :first_posts, :source => :comments, :order => 'posts.id desc, comments.id asc'
+
+  has_one :first_post
+  has_one :comment_on_first_post,  :through => :first_post, :source => :comments, :order => 'posts.id desc, comments.id asc'
+
   has_many :thinking_posts, :class_name => 'Post', :conditions => { :title => 'So I was thinking' }, :dependent => :delete_all
   has_many :welcome_posts,  :class_name => 'Post', :conditions => { :title => 'Welcome to the weblog' }
 
@@ -34,7 +41,7 @@ class Author < ActiveRecord::Base
   has_many :ordered_uniq_comments, :through => :posts, :source => :comments, :uniq => true, :order => 'comments.id'
   has_many :ordered_uniq_comments_desc, :through => :posts, :source => :comments, :uniq => true, :order => 'comments.id DESC'
   has_many :readonly_comments, :through => :posts, :source => :comments, :readonly => true
-  
+
   has_many :special_posts
   has_many :special_post_comments, :through => :special_posts, :source => :comments
 
@@ -71,6 +78,11 @@ class Author < ActiveRecord::Base
 
   has_many :categorizations
   has_many :categories, :through => :categorizations
+  has_many :named_categories, :through => :categorizations
+
+  has_many :special_categorizations
+  has_many :special_categories, :through => :special_categorizations, :source => :category
+  has_one  :special_category,   :through => :special_categorizations, :source => :category
 
   has_many :categories_like_general, :through => :categorizations, :source => :category, :class_name => 'Category', :conditions => { :name => 'General' }
 
@@ -87,18 +99,30 @@ class Author < ActiveRecord::Base
   has_many :tags,     :through => :posts # through has_many :through
   has_many :post_categories, :through => :posts, :source => :categories
 
+  has_one :essay, :primary_key => :name, :as => :writer
+
   belongs_to :author_address, :dependent => :destroy
   belongs_to :author_address_extra, :dependent => :delete, :class_name => "AuthorAddress"
 
-  attr_accessor :post_log
+  scope :relation_include_posts, includes(:posts)
+  scope :relation_include_tags, includes(:tags)
 
-  def after_initialize
+  attr_accessor :post_log
+  after_initialize :set_post_log
+
+  def set_post_log
     @post_log = []
   end
 
   def label
     "#{id}-#{name}"
   end
+
+  def social
+    %w(twitter github)
+  end
+
+  validates_presence_of :name
 
   private
     def log_before_adding(object)
@@ -126,14 +150,11 @@ class AuthorAddress < ActiveRecord::Base
   has_one :author
 
   def self.destroyed_author_address_ids
-    @destroyed_author_address_ids ||= Hash.new { |h,k| h[k] = [] }
+    @destroyed_author_address_ids ||= []
   end
 
   before_destroy do |author_address|
-    if author_address.author
-      AuthorAddress.destroyed_author_address_ids[author_address.author.id] << author_address.id
-    end
-    true
+    AuthorAddress.destroyed_author_address_ids << author_address.id
   end
 end
 

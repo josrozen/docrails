@@ -1,9 +1,10 @@
-require 'benchmark'
 require 'date'
 require 'bigdecimal'
 require 'bigdecimal/util'
+require 'active_support/core_ext/benchmark'
 
 # TODO: Autoload these files
+require 'active_record/connection_adapters/column'
 require 'active_record/connection_adapters/abstract/schema_definitions'
 require 'active_record/connection_adapters/abstract/schema_statements'
 require 'active_record/connection_adapters/abstract/database_statements'
@@ -11,10 +12,12 @@ require 'active_record/connection_adapters/abstract/quoting'
 require 'active_record/connection_adapters/abstract/connection_pool'
 require 'active_record/connection_adapters/abstract/connection_specification'
 require 'active_record/connection_adapters/abstract/query_cache'
+require 'active_record/connection_adapters/abstract/database_limits'
+require 'active_record/result'
 
 module ActiveRecord
   module ConnectionAdapters # :nodoc:
-    # ActiveRecord supports multiple database systems. AbstractAdapter and
+    # Active Record supports multiple database systems. AbstractAdapter and
     # related classes form the abstraction layer which makes this possible.
     # An AbstractAdapter represents a connection to a database, and provides an
     # abstract interface for database-specific functionality such as establishing
@@ -29,17 +32,18 @@ module ActiveRecord
     # notably, the instance methods provided by SchemaStatement are very useful.
     class AbstractAdapter
       include Quoting, DatabaseStatements, SchemaStatements
+      include DatabaseLimits
       include QueryCache
       include ActiveSupport::Callbacks
+
       define_callbacks :checkout, :checkin
 
-      @@row_even = true
-
       def initialize(connection, logger = nil) #:nodoc:
+        @active = nil
         @connection, @logger = connection, logger
-        @runtime = 0
-        @last_verification = 0
         @query_cache_enabled = false
+        @query_cache = Hash.new { |h,sql| h[sql] = {} }
+        @instrumenter = ActiveSupport::Notifications.instrumenter
       end
 
       # Returns the human-readable name of the adapter.  Use mixed case - one
@@ -51,6 +55,13 @@ module ActiveRecord
       # Does this adapter support migrations?  Backend specific, as the
       # abstract adapter always returns +false+.
       def supports_migrations?
+        false
+      end
+
+      # Can this adapter determine the primary key for tables not attached
+      # to an Active Record class, such as join tables?  Backend specific, as
+      # the abstract adapter always returns +false+.
+      def supports_primary_key?
         false
       end
 
@@ -66,9 +77,13 @@ module ActiveRecord
       def supports_ddl_transactions?
         false
       end
-      
-      # Does this adapter support savepoints? PostgreSQL and MySQL do, SQLite
-      # does not.
+
+      def supports_bulk_alter?
+        false
+      end
+
+      # Does this adapter support savepoints? PostgreSQL and MySQL do,
+      # SQLite < 3.6.8 does not.
       def supports_savepoints?
         false
       end
@@ -81,11 +96,6 @@ module ActiveRecord
         false
       end
 
-      def reset_runtime #:nodoc:
-        rt, @runtime = @runtime, 0
-        rt
-      end
-
       # QUOTING ==================================================
 
       # Override to return the quoted table name. Defaults to column quoting.
@@ -93,10 +103,16 @@ module ActiveRecord
         quote_column_name(name)
       end
 
+      # Returns a bind substitution value given a +column+ and list of current
+      # +binds+
+      def substitute_for(column, binds)
+        Arel.sql '?'
+      end
+
       # REFERENTIAL INTEGRITY ====================================
 
       # Override to turn off referential integrity while executing <tt>&block</tt>.
-      def disable_referential_integrity(&block)
+      def disable_referential_integrity
         yield
       end
 
@@ -131,9 +147,17 @@ module ActiveRecord
         # this should be overridden by concrete adapters
       end
 
-      # Returns true if its safe to reload the connection between requests for development mode.
+      ###
+      # Clear any caching the database adapter may be doing, for example
+      # clearing the prepared statement cache.  This is database specific.
+      def clear_cache!
+        # this should be overridden by concrete adapters
+      end
+
+      # Returns true if its required to reload the connection between requests for development mode.
+      # This is not the case for Ruby/MySQL and it's not necessary for any adapters except SQLite.
       def requires_reloading?
-        true
+        false
       end
 
       # Checks whether the connection to the database is still active (i.e. not stale).
@@ -183,52 +207,26 @@ module ActiveRecord
         "active_record_#{open_transactions}"
       end
 
-      def log_info(sql, name, ms)
-        if @logger && @logger.debug?
-          name = '%s (%.1fms)' % [name || 'SQL', ms]
-          @logger.debug(format_log_entry(name, sql.squeeze(' ')))
-        end
-      end
-
       protected
-        def log(sql, name)
-          if block_given?
-            result = nil
-            ms = Benchmark.ms { result = yield }
-            @runtime += ms
-            log_info(sql, name, ms)
-            result
-          else
-            log_info(sql, name, 0)
-            nil
-          end
+
+        def log(sql, name = "SQL", binds = [])
+          @instrumenter.instrument(
+            "sql.active_record",
+            :sql           => sql,
+            :name          => name,
+            :connection_id => object_id,
+            :binds         => binds) { yield }
         rescue Exception => e
-          # Log message and raise exception.
-          # Set last_verification to 0, so that connection gets verified
-          # upon reentering the request loop
-          @last_verification = 0
           message = "#{e.class.name}: #{e.message}: #{sql}"
-          log_info(message, name, 0)
-          raise ActiveRecord::StatementInvalid, message
+          @logger.debug message if @logger
+          raise translate_exception(e, message)
         end
 
-        def format_log_entry(message, dump = nil)
-          if ActiveRecord::Base.colorize_logging
-            if @@row_even
-              @@row_even = false
-              message_color, dump_color = "4;36;1", "0;1"
-            else
-              @@row_even = true
-              message_color, dump_color = "4;35;1", "0"
-            end
-
-            log_entry = "  \e[#{message_color}m#{message}\e[0m   "
-            log_entry << "\e[#{dump_color}m%#{String === dump ? 's' : 'p'}\e[0m" % dump if dump
-            log_entry
-          else
-            "%s  %s" % [message, dump]
-          end
+        def translate_exception(e, message)
+          # override in derived class
+          ActiveRecord::StatementInvalid.new(message)
         end
+
     end
   end
 end

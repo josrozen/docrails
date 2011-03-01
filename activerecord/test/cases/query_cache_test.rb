@@ -1,14 +1,16 @@
 require "cases/helper"
 require 'models/topic'
-require 'models/reply'
 require 'models/task'
-require 'models/course'
 require 'models/category'
 require 'models/post'
 
 
 class QueryCacheTest < ActiveRecord::TestCase
   fixtures :tasks, :topics, :categories, :posts, :categories_posts
+
+  def setup
+    Task.connection.clear_query_cache
+  end
 
   def test_find_queries
     assert_queries(2) { Task.find(1); Task.find(1) }
@@ -17,6 +19,12 @@ class QueryCacheTest < ActiveRecord::TestCase
   def test_find_queries_with_cache
     Task.cache do
       assert_queries(1) { Task.find(1); Task.find(1) }
+    end
+  end
+
+  def test_find_queries_with_cache_multi_record
+    Task.cache do
+      assert_queries(2) { Task.find(1); Task.find(1); Task.find(2) }
     end
   end
 
@@ -49,8 +57,19 @@ class QueryCacheTest < ActiveRecord::TestCase
   end
 
   def test_cache_does_not_wrap_string_results_in_arrays
+    require 'sqlite3/version' if current_adapter?(:SQLite3Adapter)
+
     Task.cache do
-      assert_instance_of String, Task.connection.select_value("SELECT count(*) AS count_all FROM tasks")
+      # Oracle adapter returns count() as Fixnum or Float
+      if current_adapter?(:OracleAdapter)
+        assert_kind_of Numeric, Task.connection.select_value("SELECT count(*) AS count_all FROM tasks")
+      elsif current_adapter?(:SQLite3Adapter) && SQLite3::VERSION > '1.2.5' || current_adapter?(:Mysql2Adapter) || current_adapter?(:MysqlAdapter)
+        # Future versions of the sqlite3 adapter will return numeric
+        assert_instance_of Fixnum,
+         Task.connection.select_value("SELECT count(*) AS count_all FROM tasks")
+      else
+        assert_instance_of String, Task.connection.select_value("SELECT count(*) AS count_all FROM tasks")
+      end
     end
   end
 end
@@ -114,7 +133,6 @@ class QueryCacheExpiryTest < ActiveRecord::TestCase
   def test_cache_is_expired_by_habtm_delete
     ActiveRecord::Base.connection.expects(:clear_query_cache).times(2)
     ActiveRecord::Base.cache do
-      c = Category.find(1)
       p = Post.find(1)
       assert p.categories.any?
       p.categories.delete_all

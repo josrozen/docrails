@@ -1,23 +1,25 @@
 require 'cases/helper'
 require 'models/post'
+require 'models/tag'
 require 'models/author'
 require 'models/comment'
 require 'models/category'
 require 'models/categorization'
+require 'models/tagging'
+require 'active_support/core_ext/array/random_access'
 
 module Remembered
-  def self.included(base)
-    base.extend ClassMethods
-    base.class_eval do
-      after_create :remember
-    protected
-      def remember; self.class.remembered << self; end
-    end
+  extend ActiveSupport::Concern
+
+  included do
+    after_create :remember
+  protected
+    def remember; self.class.remembered << self; end
   end
 
   module ClassMethods
     def remembered; @@remembered ||= []; end
-    def rand; @@remembered.rand; end
+    def sample; @@remembered.sample; end
   end
 end
 
@@ -72,23 +74,21 @@ class EagerLoadPolyAssocsTest < ActiveRecord::TestCase
      ShapeExpression, NonPolyOne, NonPolyTwo].each do |c|
       c.delete_all
     end
-
   end
-
 
   def generate_test_object_graphs
     1.upto(NUM_SIMPLE_OBJS) do
       [Circle, Square, Triangle, NonPolyOne, NonPolyTwo].map(&:create!)
     end
     1.upto(NUM_SIMPLE_OBJS) do
-      PaintColor.create!(:non_poly_one_id => NonPolyOne.rand.id)
-      PaintTexture.create!(:non_poly_two_id => NonPolyTwo.rand.id)
+      PaintColor.create!(:non_poly_one_id => NonPolyOne.sample.id)
+      PaintTexture.create!(:non_poly_two_id => NonPolyTwo.sample.id)
     end
     1.upto(NUM_SHAPE_EXPRESSIONS) do
-      shape_type = [Circle, Square, Triangle].rand
-      paint_type = [PaintColor, PaintTexture].rand
-      ShapeExpression.create!(:shape_type => shape_type.to_s, :shape_id => shape_type.rand.id,
-                              :paint_type => paint_type.to_s, :paint_id => paint_type.rand.id)
+      shape_type = [Circle, Square, Triangle].sample
+      paint_type = [PaintColor, PaintTexture].sample
+      ShapeExpression.create!(:shape_type => shape_type.to_s, :shape_id => shape_type.sample.id,
+                              :paint_type => paint_type.to_s, :paint_id => paint_type.sample.id)
     end
   end
 

@@ -1,6 +1,6 @@
 require 'abstract_unit'
 
-class XmlParamsParsingTest < ActionController::IntegrationTest
+class XmlParamsParsingTest < ActionDispatch::IntegrationTest
   class TestController < ActionController::Base
     class << self
       attr_accessor :last_request_parameters
@@ -14,6 +14,20 @@ class XmlParamsParsingTest < ActionController::IntegrationTest
 
   def teardown
     TestController.last_request_parameters = nil
+  end
+
+  test "parses a strict rack.input" do
+    class Linted
+      undef call if method_defined?(:call)
+      def call(env)
+        bar = env['action_dispatch.request.request_parameters']['foo']
+        result = "<ok>#{bar}</ok>"
+        [200, {"Content-Type" => "application/xml", "Content-Length" => result.length.to_s}, [result]]
+      end
+    end
+    req = Rack::MockRequest.new(ActionDispatch::ParamsParser.new(Linted.new))
+    resp = req.post('/', "CONTENT_TYPE" => "application/xml", :input => "<foo>bar</foo>", :lint => true)
+    assert_equal "<ok>bar</ok>", resp.body
   end
 
   test "parses hash params" do
@@ -35,6 +49,21 @@ class XmlParamsParsingTest < ActionController::IntegrationTest
       assert_equal "image/jpg", person['person']['avatar'].content_type
       assert_equal "me.jpg", person['person']['avatar'].original_filename
       assert_equal "ABC", person['person']['avatar'].read
+    end
+  end
+
+  test "logs error if parsing unsuccessful" do
+    with_test_routing do
+      begin
+        $stderr = StringIO.new
+        xml = "<person><name>David</name><avatar type='file' name='me.jpg' content_type='image/jpg'>#{ActiveSupport::Base64.encode64('ABC')}</avatar></pineapple>"
+        post "/parse", xml, default_headers.merge('action_dispatch.show_exceptions' => true)
+        assert_response :error
+        $stderr.rewind && err = $stderr.read
+        assert err =~ /Error occurred while parsing request parameters/
+      ensure
+        $stderr = STDERR
+      end
     end
   end
 
@@ -68,8 +97,8 @@ class XmlParamsParsingTest < ActionController::IntegrationTest
   private
     def with_test_routing
       with_routing do |set|
-        set.draw do |map|
-          map.connect ':action', :controller => "xml_params_parsing_test/test"
+        set.draw do
+          match ':action', :to => ::XmlParamsParsingTest::TestController
         end
         yield
       end

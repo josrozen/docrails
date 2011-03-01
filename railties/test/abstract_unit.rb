@@ -1,31 +1,18 @@
-$:.unshift File.dirname(__FILE__) + "/../../activesupport/lib"
-$:.unshift File.dirname(__FILE__) + "/../../activerecord/lib"
-$:.unshift File.dirname(__FILE__) + "/../../actionpack/lib"
-$:.unshift File.dirname(__FILE__) + "/../../actionmailer/lib"
-$:.unshift File.dirname(__FILE__) + "/../lib"
-$:.unshift File.dirname(__FILE__) + "/../builtin/rails_info"
+require File.expand_path("../../../load_paths", __FILE__)
 
 require 'stringio'
-require 'rubygems'
 require 'test/unit'
-
-gem 'mocha', '>= 0.9.5'
-require 'mocha'
+require 'fileutils'
 
 require 'active_support'
-require 'active_support/core/all'
-require 'active_support/test_case'
+require 'active_support/core_ext/logger'
 
-if defined?(RAILS_ROOT)
-  RAILS_ROOT.replace File.dirname(__FILE__)
-else
-  RAILS_ROOT = File.dirname(__FILE__)
-end
+require 'action_controller'
+require 'rails/all'
 
-def uses_gem(gem_name, test_name, version = '> 0')
-  gem gem_name.to_s, version
-  require gem_name.to_s
-  yield
-rescue LoadError
-  $stderr.puts "Skipping #{test_name} tests. `gem install #{gem_name}` and try again."
+# TODO: Remove these hacks
+module TestApp
+  class Application < Rails::Application
+    config.root = File.dirname(__FILE__)
+  end
 end

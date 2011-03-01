@@ -1,22 +1,32 @@
 require 'active_record/connection_adapters/sqlite_adapter'
+require 'sqlite3'
 
 module ActiveRecord
   class Base
     # sqlite3 adapter reuses sqlite_connection.
     def self.sqlite3_connection(config) # :nodoc:
-      parse_sqlite_config!(config)
+      # Require database.
+      unless config[:database]
+        raise ArgumentError, "No database file specified. Missing argument: database"
+      end
 
-      unless self.class.const_defined?(:SQLite3)
-        require_library_or_gem(config[:adapter])
+      # Allow database path relative to Rails.root, but only if
+      # the database path is not the special path that tells
+      # Sqlite to build a database only in memory.
+      if defined?(Rails.root) && ':memory:' != config[:database]
+        config[:database] = File.expand_path(config[:database], Rails.root)
+      end
+
+      unless 'sqlite3' == config[:adapter]
+        raise ArgumentError, 'adapter name should be "sqlite3"'
       end
 
       db = SQLite3::Database.new(
         config[:database],
-        :results_as_hash => true,
-        :type_translation => false
+        :results_as_hash => true
       )
 
-      db.busy_timeout(config[:timeout]) unless config[:timeout].nil?
+      db.busy_timeout(config[:timeout]) if config[:timeout]
 
       ConnectionAdapters::SQLite3Adapter.new(db, logger, config)
     end
@@ -24,11 +34,16 @@ module ActiveRecord
 
   module ConnectionAdapters #:nodoc:
     class SQLite3Adapter < SQLiteAdapter # :nodoc:
-      def table_structure(table_name)
-        returning structure = @connection.table_info(quote_table_name(table_name)) do
-          raise(ActiveRecord::StatementInvalid, "Could not find table '#{table_name}'") if structure.empty?
+
+      # Returns the current database encoding format as a string, eg: 'UTF-8'
+      def encoding
+        if @connection.respond_to?(:encoding)
+          @connection.encoding.to_s
+        else
+          @connection.execute('PRAGMA encoding')[0]['encoding']
         end
       end
+
     end
   end
 end

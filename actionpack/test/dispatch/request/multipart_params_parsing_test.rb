@@ -1,6 +1,6 @@
 require 'abstract_unit'
 
-class MultipartParamsParsingTest < ActionController::IntegrationTest
+class MultipartParamsParsingTest < ActionDispatch::IntegrationTest
   class TestController < ActionController::Base
     class << self
       attr_accessor :last_request_parameters
@@ -36,7 +36,6 @@ class MultipartParamsParsingTest < ActionController::IntegrationTest
     assert_equal 'bar', params['foo']
 
     file = params['file']
-    assert_kind_of Tempfile, file
     assert_equal 'file.txt', file.original_filename
     assert_equal "text/plain", file.content_type
     assert_equal 'contents', file.read
@@ -48,8 +47,6 @@ class MultipartParamsParsingTest < ActionController::IntegrationTest
 
     file = params['file']
     foo  = params['foo']
-
-    assert_kind_of Tempfile, file
 
     assert_equal 'file.txt', file.original_filename
     assert_equal "text/plain", file.content_type
@@ -64,11 +61,9 @@ class MultipartParamsParsingTest < ActionController::IntegrationTest
 
     file = params['file']
 
-    assert_kind_of Tempfile, file
-
     assert_equal 'file.txt', file.original_filename
     assert_equal "text/plain", file.content_type
-    assert ('a' * 20480) == file.read
+    assert_equal(('a' * 20480), file.read)
   end
 
   test "parses binary file" do
@@ -77,27 +72,31 @@ class MultipartParamsParsingTest < ActionController::IntegrationTest
     assert_equal 'bar', params['foo']
 
     file = params['file']
-    assert_kind_of Tempfile, file
     assert_equal 'file.csv', file.original_filename
     assert_nil file.content_type
     assert_equal 'contents', file.read
 
     file = params['flowers']
-    assert_kind_of Tempfile, file
     assert_equal 'flowers.jpg', file.original_filename
     assert_equal "image/jpeg", file.content_type
     assert_equal 19512, file.size
   end
 
+  # Pending fix in Rack 1.2.2
+  # http://rack.lighthouseapp.com/projects/22435-rack/tickets/79-multipart-handling-incorrectly-assuming-file-upload
   test "parses mixed files" do
-    params = parse_multipart('mixed_files')
-    assert_equal %w(files foo), params.keys.sort
-    assert_equal 'bar', params['foo']
+    if Rack.release <= '1.2.1'
+      $stderr.puts 'multipart/mixed parsing pending fix in Rack 1.2.2'
+    else
+      params = parse_multipart('mixed_files')
+      assert_equal %w(files foo), params.keys.sort
+      assert_equal 'bar', params['foo']
 
-    # Rack doesn't handle multipart/mixed for us.
-    files = params['files']
-    files.force_encoding('ASCII-8BIT') if files.respond_to?(:force_encoding)
-    assert_equal 19756, files.size
+      # Rack doesn't handle multipart/mixed for us.
+      files = params['files']
+      files.force_encoding('ASCII-8BIT') if files.respond_to?(:force_encoding)
+      assert_equal 19756, files.size
+    end
   end
 
   test "does not create tempfile if no file has been selected" do
@@ -120,8 +119,6 @@ class MultipartParamsParsingTest < ActionController::IntegrationTest
       fixture = FIXTURE_PATH + "/mona_lisa.jpg"
       params = { :uploaded_data => fixture_file_upload(fixture, "image/jpg") }
       post '/read', params
-      expected_length = 'File: '.length + File.size(fixture)
-      assert_equal expected_length, response.content_length
     end
   end
 
@@ -152,8 +149,8 @@ class MultipartParamsParsingTest < ActionController::IntegrationTest
 
     def with_test_routing
       with_routing do |set|
-        set.draw do |map|
-          map.connect ':action', :controller => "multipart_params_parsing_test/test"
+        set.draw do
+          match ':action', :to => 'multipart_params_parsing_test/test'
         end
         yield
       end

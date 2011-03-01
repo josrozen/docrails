@@ -11,6 +11,11 @@ module ActiveSupport
         @@at_exit = false
 
         def pending(description = "", &block)
+          if description.is_a?(Symbol)
+            is_pending = $tags[description]
+            return block.call unless is_pending
+          end
+
           if block_given?
             failed = false
 
@@ -20,13 +25,13 @@ module ActiveSupport
               failed = true
             end
 
-            flunk("<#{description}> did not fail.") unless failed 
+            flunk("<#{description}> did not fail.") unless failed
           end
 
           caller[0] =~ (/(.*):(.*):in `(.*)'/)
           @@pending_cases << "#{$3} at #{$1}, line #{$2}"
           print "P"
-      
+
           @@at_exit ||= begin
             at_exit do
               puts "\nPending Cases:"
@@ -37,7 +42,7 @@ module ActiveSupport
           end
         end
       end
-      
+
     end
   end
 end

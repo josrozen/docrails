@@ -14,13 +14,13 @@ h3. Usage
 To apply a template, you need to provide the Rails generator with the location of the template you wish to apply, using -m option :
 
 <shell>
-$ rails blog -m ~/template.rb
+$ rails new blog -m ~/template.rb
 </shell>
 
 It's also possible to apply a template using a URL :
 
 <shell>
-$ rails blog -m http://gist.github.com/31208.txt
+$ rails new blog -m https://gist.github.com/755496.txt
 </shell>
 
 Alternatively, you can use the rake task +rails:template+ to apply a template to an existing Rails application :
@@ -37,7 +37,7 @@ Rails templates API is very self explanatory and easy to understand. Here's an e
 # template.rb
 run "rm public/index.html"
 generate(:scaffold, "person name:string")
-route "map.root :controller => 'people'"
+route "root :to => 'people#index'"
 rake("db:migrate")
 
 git :init
@@ -49,13 +49,13 @@ The following sections outlines the primary methods provided by the API :
 
 h4. gem(name, options = {})
 
-Adds a +config.gem+ entry for the supplied gem to the generated application’s +config/environment.rb+.
+Adds a +gem+ entry for the supplied gem to the generated application’s +Gemfile+.
 
-For example, if your application depends on the gems +bj+ and +hpricot+ :
+For example, if your application depends on the gems +bj+ and +nokogiri+ :
 
 <ruby>
 gem "bj"
-gem "hpricot", :version => '0.6', :source => "http://code.whytheluckystiff.net"
+gem "nokogiri"
 </ruby>
 
 Please note that this will NOT install the gems for you. So you may want to run the +rake gems:install+ task too :
@@ -65,6 +65,16 @@ rake "gems:install"
 </ruby>
 
 And let Rails take care of installing the required gems if they’re not already installed.
+
+h4. add_source(source, options = {})
+
+Adds the given source to the generated application's +Gemfile+.
+
+For example, if you need to source a gem from "http://code.whytheluckystiff.net":
+
+<ruby>
+add_source "http://code.whytheluckystiff.net"
+</ruby>
 
 h4. plugin(name, options = {})
 
@@ -79,7 +89,7 @@ plugin 'authentication', :git => 'git://github.com/foor/bar.git'
 You can even install plugins as git submodules :
 
 <ruby>
-plugin 'authentication', :git => 'git://github.com/foor/bar.git', 
+plugin 'authentication', :git => 'git://github.com/foor/bar.git',
                          :submodule => true
 </ruby>
 
@@ -88,7 +98,7 @@ Please note that you need to +git :init+ before you can install a plugin as a su
 Or use plain old SVN :
 
 <ruby>
-plugin 'wtfsvn' :svn => 'svn://crap.com/wtf/trunk'
+plugin 'usingsvn', :svn => 'svn://example.com/usingsvn/trunk'
 </ruby>
 
 h4. vendor/lib/file/initializer(filename, data = nil, &block)
@@ -103,7 +113,7 @@ class Object
   def not_nil?
     !nil?
   end
-  
+
   def not_blank?
     !blank?
   end
@@ -113,7 +123,7 @@ CODE
 
 Similarly +lib()+ creates a file in the +lib/+ directory and +vendor()+ creates a file in the +vendor/+ directory.
 
-There is even +file()+, which accepts a relative path from +RAILS_ROOT+ and creates all the directories/file needed :
+There is even +file()+, which accepts a relative path from +Rails.root+ and creates all the directories/file needed :
 
 <ruby>
 file 'app/components/foo.rb', <<-CODE
@@ -183,20 +193,18 @@ h4. route(routing_code)
 This adds a routing entry to the +config/routes.rb+ file. In above steps, we generated a person scaffold and also removed +public/index.html+. Now to make +PeopleController#index+ as the default page for the application :
 
 <ruby>
-route "map.root :controller => :person"
+route "root :to => 'person#index'"
 </ruby>
 
 h4. inside(dir)
 
-I have my edge rails lying at +~/commit-rails/rails+. So every time i have to manually symlink edge from my new app. But now :
+Enables you to run a command from the given directory. For example, if you have a copy of edge rails that you wish to symlink from your new apps, you can do this:
 
 <ruby>
 inside('vendor') do
   run "ln -s ~/commit-rails/rails rails"
 end
 </ruby>
-
-So +inside()+ runs the command from the given directory.
 
 h4. ask(question)
 
@@ -232,7 +240,5 @@ git :commit => "-a -m 'Initial commit'"
 </ruby>
 
 h3. Changelog
-
-"Lighthouse ticket":http://rails.lighthouseapp.com/projects/16213-rails-guides/tickets/78
 
 * April 29, 2009: Initial version by "Pratik":credits.html#lifo

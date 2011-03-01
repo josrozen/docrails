@@ -30,9 +30,7 @@ module ActionController #:nodoc:
     #     cache_sweeper OpenBar::Sweeper, :only => [ :edit, :destroy, :share ]
     #   end
     module Sweeping
-      def self.included(base) #:nodoc:
-        base.extend(ClassMethods)
-      end
+      extend ActiveSupport::Concern
 
       module ClassMethods #:nodoc:
         def cache_sweeper(*sweepers)
@@ -59,6 +57,7 @@ module ActionController #:nodoc:
         def before(controller)
           self.controller = controller
           callback(:before) if controller.perform_caching
+          true # before method from sweeper should always return true
         end
 
         def after(controller)
@@ -70,7 +69,7 @@ module ActionController #:nodoc:
         protected
           # gets the action cache path for the given options.
           def action_path_for(options)
-            ActionController::Caching::Actions::ActionCachePath.path_for(controller, options)
+            Actions::ActionCachePath.new(controller, options).path
           end
 
           # Retrieve instance variables set in the controller.

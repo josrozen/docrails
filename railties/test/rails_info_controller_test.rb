@@ -1,35 +1,41 @@
 require 'abstract_unit'
 require 'action_controller'
-require 'action_controller/testing/process'
 
-require 'rails/info'
-require 'rails/info_controller'
-
-ActionController::Routing::Routes.draw do |map|
-  map.connect ':controller/:action/:id'
+module ActionController
+  class Base
+    include ActionController::Testing
+  end
 end
 
 class InfoControllerTest < ActionController::TestCase
   tests Rails::InfoController
 
   def setup
-    @controller.stubs(:consider_all_requests_local => false, :local_request? => true)
+    Rails.application.routes.draw do
+      match '/rails/info/properties' => "rails/info#properties"
+    end
+    @request.stubs(:local? => true)
+    @controller.stubs(:consider_all_requests_local? => false)
+    @routes = Rails.application.routes
+
+    Rails::InfoController.send(:include, @routes.url_helpers)
   end
 
   test "info controller does not allow remote requests" do
-    @controller.stubs(:consider_all_requests_local => false, :local_request? => false)
+    @request.stubs(:local? => false)
     get :properties
     assert_response :forbidden
   end
 
   test "info controller renders an error message when request was forbidden" do
-    @controller.stubs(:consider_all_requests_local => false, :local_request? => false)
+    @request.stubs(:local? => false)
     get :properties
     assert_select 'p'
   end
 
   test "info controller allows requests when all requests are considered local" do
-    @controller.stubs(:consider_all_requests_local => true, :local_request? => false)
+    @request.stubs(:local? => false)
+    @controller.stubs(:consider_all_requests_local? => true)
     get :properties
     assert_response :success
   end

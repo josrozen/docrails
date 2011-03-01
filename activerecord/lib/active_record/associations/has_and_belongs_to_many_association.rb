@@ -1,126 +1,73 @@
 module ActiveRecord
+  # = Active Record Has And Belongs To Many Association
   module Associations
-    class HasAndBelongsToManyAssociation < AssociationCollection #:nodoc:
-      def create(attributes = {})
-        create_record(attributes) { |record| insert_record(record) }
+    class HasAndBelongsToManyAssociation < CollectionAssociation #:nodoc:
+      attr_reader :join_table
+
+      def initialize(owner, reflection)
+        @join_table = Arel::Table.new(reflection.options[:join_table])
+        super
       end
 
-      def create!(attributes = {})
-        create_record(attributes) { |record| insert_record(record, true) }
-      end
+      def insert_record(record, validate = true)
+        return if record.new_record? && !record.save(:validate => validate)
 
-      def columns
-        @reflection.columns(@reflection.options[:join_table], "#{@reflection.options[:join_table]} Columns")
-      end
+        if options[:insert_sql]
+          owner.connection.insert(interpolate(options[:insert_sql], record))
+        else
+          stmt = join_table.compile_insert(
+            join_table[reflection.foreign_key]             => owner.id,
+            join_table[reflection.association_foreign_key] => record.id
+          )
 
-      def reset_column_information
-        @reflection.reset_column_information
-      end
-
-      protected
-        def construct_find_options!(options)
-          options[:joins]      = @join_sql
-          options[:readonly]   = finding_with_ambiguous_select?(options[:select] || @reflection.options[:select])
-          options[:select]   ||= (@reflection.options[:select] || '*')
+          owner.connection.insert stmt.to_sql
         end
-        
+
+        record
+      end
+
+      def association_scope
+        super.joins(construct_joins)
+      end
+
+      private
+
         def count_records
           load_target.size
         end
 
-        def insert_record(record, force = true, validate = true)
-          if record.new_record?
-            if force
-              record.save!
-            else
-              return false unless record.save(validate)
-            end
-          end
-
-          if @reflection.options[:insert_sql]
-            @owner.connection.insert(interpolate_sql(@reflection.options[:insert_sql], record))
+        def delete_records(records, method)
+          if sql = options[:delete_sql]
+            records.each { |record| owner.connection.delete(interpolate(sql, record)) }
           else
-            attributes = columns.inject({}) do |attrs, column|
-              case column.name.to_s
-                when @reflection.primary_key_name.to_s
-                  attrs[column.name] = owner_quoted_id
-                when @reflection.association_foreign_key.to_s
-                  attrs[column.name] = record.quoted_id
-                else
-                  if record.has_attribute?(column.name)
-                    value = @owner.send(:quote_value, record[column.name], column)
-                    attrs[column.name] = value unless value.nil?
-                  end
-              end
-              attrs
-            end
-
-            sql =
-              "INSERT INTO #{@owner.connection.quote_table_name @reflection.options[:join_table]} (#{@owner.send(:quoted_column_names, attributes).join(', ')}) " +
-              "VALUES (#{attributes.values.join(', ')})"
-
-            @owner.connection.insert(sql)
-          end
-
-          return true
-        end
-
-        def delete_records(records)
-          if sql = @reflection.options[:delete_sql]
-            records.each { |record| @owner.connection.delete(interpolate_sql(sql, record)) }
-          else
-            ids = quoted_record_ids(records)
-            sql = "DELETE FROM #{@owner.connection.quote_table_name @reflection.options[:join_table]} WHERE #{@reflection.primary_key_name} = #{owner_quoted_id} AND #{@reflection.association_foreign_key} IN (#{ids})"
-            @owner.connection.delete(sql)
+            relation = join_table
+            stmt = relation.where(relation[reflection.foreign_key].eq(owner.id).
+              and(relation[reflection.association_foreign_key].in(records.map { |x| x.id }.compact))
+            ).compile_delete
+            owner.connection.delete stmt.to_sql
           end
         end
 
-        def construct_sql
-          if @reflection.options[:finder_sql]
-            @finder_sql = interpolate_sql(@reflection.options[:finder_sql])
-          else
-            @finder_sql = "#{@owner.connection.quote_table_name @reflection.options[:join_table]}.#{@reflection.primary_key_name} = #{owner_quoted_id} "
-            @finder_sql << " AND (#{conditions})" if conditions
-          end
+        def construct_joins
+          right = join_table
+          left  = reflection.klass.arel_table
 
-          @join_sql = "INNER JOIN #{@owner.connection.quote_table_name @reflection.options[:join_table]} ON #{@reflection.quoted_table_name}.#{@reflection.klass.primary_key} = #{@owner.connection.quote_table_name @reflection.options[:join_table]}.#{@reflection.association_foreign_key}"
+          condition = left[reflection.klass.primary_key].eq(
+            right[reflection.association_foreign_key])
 
-          if @reflection.options[:counter_sql]
-            @counter_sql = interpolate_sql(@reflection.options[:counter_sql])
-          elsif @reflection.options[:finder_sql]
-            # replace the SELECT clause with COUNT(*), preserving any hints within /* ... */
-            @reflection.options[:counter_sql] = @reflection.options[:finder_sql].sub(/SELECT (\/\*.*?\*\/ )?(.*)\bFROM\b/im) { "SELECT #{$1}COUNT(*) FROM" }
-            @counter_sql = interpolate_sql(@reflection.options[:counter_sql])
-          else
-            @counter_sql = @finder_sql
-          end
+          right.create_join(right, right.create_on(condition))
         end
 
-        def construct_scope
-          { :find => {  :conditions => @finder_sql,
-                        :joins => @join_sql,
-                        :readonly => false,
-                        :order => @reflection.options[:order],
-                        :include => @reflection.options[:include],
-                        :limit => @reflection.options[:limit] } }
+        def construct_owner_conditions
+          super(join_table)
         end
 
-        # Join tables with additional columns on top of the two foreign keys must be considered ambiguous unless a select
-        # clause has been explicitly defined. Otherwise you can get broken records back, if, for example, the join column also has
-        # an id column. This will then overwrite the id column of the records coming back.
-        def finding_with_ambiguous_select?(select_clause)
-          !select_clause && columns.size != 2
+        def select_value
+          super || reflection.klass.arel_table[Arel.star]
         end
 
-      private
-        def create_record(attributes, &block)
-          # Can't use Base.create because the foreign key may be a protected attribute.
-          ensure_owner_is_not_new
-          if attributes.is_a?(Array)
-            attributes.collect { |attr| create(attr) }
-          else
-            build_record(attributes, &block)
-          end
+        def invertible_for?(record)
+          false
         end
     end
   end

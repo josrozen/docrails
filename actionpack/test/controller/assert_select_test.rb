@@ -1,3 +1,4 @@
+# encoding: utf-8
 #--
 # Copyright (c) 2006 Assaf Arkin (http://labnotes.org)
 # Under MIT and/or CC By license.
@@ -6,29 +7,16 @@
 require 'abstract_unit'
 require 'controller/fake_controllers'
 
-
-unless defined?(ActionMailer)
-  begin
-    $:.unshift("#{File.dirname(__FILE__)}/../../../actionmailer/lib")
-    require 'action_mailer'
-  rescue LoadError => e
-    raise unless e.message =~ /action_mailer/
-    require 'rubygems'
-    gem 'actionmailer'
-  end
-end
-
-ActionMailer::Base.template_root = FIXTURE_LOAD_PATH
+require 'action_mailer'
+ActionMailer::Base.view_paths = FIXTURE_LOAD_PATH
 
 class AssertSelectTest < ActionController::TestCase
   Assertion = ActiveSupport::TestCase::Assertion
 
   class AssertSelectMailer < ActionMailer::Base
     def test(html)
-      recipients "test <test@test.host>"
-      from "test@test.host"
-      subject "Test e-mail"
-      part :content_type=>"text/html", :body=>html
+      mail :body => html, :content_type => "text/html",
+        :subject => "Test e-mail", :from => "test@test.host", :to => "test <test@test.host>"
     end
   end
 
@@ -90,8 +78,13 @@ class AssertSelectTest < ActionController::TestCase
   def test_assert_select
     render_html %Q{<div id="1"></div><div id="2"></div>}
     assert_select "div", 2
-    assert_failure(/Expected at least 3 elements matching \"div\", found 2/) { assert_select "div", 3 }
     assert_failure(/Expected at least 1 element matching \"p\", found 0/) { assert_select "p" }
+  end
+
+  def test_equality_integer
+    render_html %Q{<div id="1"></div><div id="2"></div>}
+    assert_failure(/Expected exactly 3 elements matching \"div\", found 2/) { assert_select "div", 3 }
+    assert_failure(/Expected exactly 0 elements matching \"div\", found 2/) { assert_select "div", 0 }
   end
 
   def test_equality_true_false
@@ -102,6 +95,11 @@ class AssertSelectTest < ActionController::TestCase
     assert_raise(Assertion) { assert_select "p", true }
     assert_raise(Assertion) { assert_select "div", false }
     assert_nothing_raised    { assert_select "p", false }
+  end
+
+  def test_equality_false_message
+    render_html %Q{<div id="1"></div><div id="2"></div>}
+    assert_failure(/Expected exactly 0 elements matching \"div\", found 2/) { assert_select "div", false }
   end
 
   def test_equality_string_and_regexp
@@ -138,7 +136,7 @@ class AssertSelectTest < ActionController::TestCase
   def test_counts
     render_html %Q{<div id="1">foo</div><div id="2">foo</div>}
     assert_nothing_raised               { assert_select "div", 2 }
-    assert_failure(/Expected at least 3 elements matching \"div\", found 2/) do
+    assert_failure(/Expected exactly 3 elements matching \"div\", found 2/) do
       assert_select "div", 3
     end
     assert_nothing_raised               { assert_select "div", 1..2 }
@@ -146,7 +144,7 @@ class AssertSelectTest < ActionController::TestCase
       assert_select "div", 3..4
     end
     assert_nothing_raised               { assert_select "div", :count=>2 }
-    assert_failure(/Expected at least 3 elements matching \"div\", found 2/) do
+    assert_failure(/Expected exactly 3 elements matching \"div\", found 2/) do
       assert_select "div", :count=>3
     end
     assert_nothing_raised               { assert_select "div", :minimum=>1 }
@@ -211,13 +209,13 @@ class AssertSelectTest < ActionController::TestCase
       assert_nothing_raised    { assert_select "div", "foo" }
       assert_nothing_raised    { assert_select "div", "bar" }
       assert_nothing_raised    { assert_select "div", /\w*/ }
-      assert_nothing_raised    { assert_select "div", /\w*/, :count=>2 }
-      assert_raise(Assertion) { assert_select "div", :text=>"foo", :count=>2 }
+      assert_nothing_raised    { assert_select "div", :text => /\w*/, :count=>2 }
+      assert_raise(Assertion)  { assert_select "div", :text=>"foo", :count=>2 }
       assert_nothing_raised    { assert_select "div", :html=>"<span>bar</span>" }
       assert_nothing_raised    { assert_select "div", :html=>"<span>bar</span>" }
       assert_nothing_raised    { assert_select "div", :html=>/\w*/ }
       assert_nothing_raised    { assert_select "div", :html=>/\w*/, :count=>2 }
-      assert_raise(Assertion) { assert_select "div", :html=>"<span>foo</span>", :count=>2 }
+      assert_raise(Assertion)  { assert_select "div", :html=>"<span>foo</span>", :count=>2 }
     end
   end
 
@@ -258,6 +256,13 @@ class AssertSelectTest < ActionController::TestCase
     assert_raise(Assertion) {assert_select_rjs :insert, :top, "test2"}
   end
 
+  def test_assert_select_rjs_for_redirect_to
+    render_rjs do |page|
+      page.redirect_to '/'
+    end
+    assert_select_rjs :redirect, '/'
+  end
+
   def test_elect_with_xml_namespace_attributes
     render_html %Q{<link xlink:href="http://nowhere.com"></link>}
     assert_nothing_raised { assert_select "link[xlink:href=http://nowhere.com]" }
@@ -269,8 +274,8 @@ class AssertSelectTest < ActionController::TestCase
 
   def test_css_select
     render_html %Q{<div id="1"></div><div id="2"></div>}
-    assert 2, css_select("div").size
-    assert 0, css_select("p").size
+    assert_equal 2, css_select("div").size
+    assert_equal 0, css_select("p").size
   end
 
   def test_nested_css_select
@@ -351,7 +356,6 @@ class AssertSelectTest < ActionController::TestCase
       assert_select str, :text => "\343\203\201\343\202\261\343\203\203\343\203\210"
       assert_select str, "\343\203\201\343\202\261\343\203\203\343\203\210"
       if str.respond_to?(:force_encoding)
-        str.force_encoding(Encoding::UTF_8)
         assert_select str, /\343\203\201..\343\203\210/u
         assert_raise(Assertion) { assert_select str, /\343\203\201.\343\203\210/u }
       else
@@ -455,8 +459,8 @@ class AssertSelectTest < ActionController::TestCase
 
     assert_select_rjs :remove, "test1"
 
-  rescue Assertion
-    assert_equal "No RJS statement that removes 'test1' was rendered.", $!.message
+  rescue Assertion => e
+    assert_equal "No RJS statement that removes 'test1' was rendered.", e.message
   end
 
   def test_assert_select_rjs_for_remove_ignores_block
@@ -487,8 +491,8 @@ class AssertSelectTest < ActionController::TestCase
 
     assert_select_rjs :show, "test1"
 
-  rescue Assertion
-    assert_equal "No RJS statement that shows 'test1' was rendered.", $!.message
+  rescue Assertion => e
+    assert_equal "No RJS statement that shows 'test1' was rendered.", e.message
   end
 
   def test_assert_select_rjs_for_show_ignores_block
@@ -519,8 +523,8 @@ class AssertSelectTest < ActionController::TestCase
 
     assert_select_rjs :hide, "test1"
 
-  rescue Assertion
-    assert_equal "No RJS statement that hides 'test1' was rendered.", $!.message
+  rescue Assertion => e
+    assert_equal "No RJS statement that hides 'test1' was rendered.", e.message
   end
 
   def test_assert_select_rjs_for_hide_ignores_block
@@ -551,8 +555,8 @@ class AssertSelectTest < ActionController::TestCase
 
     assert_select_rjs :toggle, "test1"
 
-  rescue Assertion
-    assert_equal "No RJS statement that toggles 'test1' was rendered.", $!.message
+  rescue Assertion => e
+    assert_equal "No RJS statement that toggles 'test1' was rendered.", e.message
   end
 
   def test_assert_select_rjs_for_toggle_ignores_block
@@ -709,7 +713,7 @@ EOF
 
   def test_assert_select_email
     assert_raise(Assertion) { assert_select_email {} }
-    AssertSelectMailer.deliver_test "<div><p>foo</p><p>bar</p></div>"
+    AssertSelectMailer.test("<div><p>foo</p><p>bar</p></div>").deliver
     assert_select_email do
       assert_select "div:root" do
         assert_select "p:first-child", "foo"
@@ -725,7 +729,7 @@ EOF
     end
 
     def render_rjs(&block)
-      @controller.response_with &block
+      @controller.response_with(&block)
       get :rjs
     end
 
