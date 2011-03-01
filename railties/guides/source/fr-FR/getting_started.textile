@@ -128,7 +128,7 @@ Elle est généralement considéré être la thèse doctorale de Roy Fielding, "
 
 Par exemple, pour une application Rails une requète telle que :
 
-<tt>DELETE /photos/17<tt>
+<tt>DELETE /photos/17</tt>
 
 serait comprise comme faisant référence à une ressource photo avec l'ID 17, et indiquant une certaine action : la suppression de cette ressource. REST est un style naturel pour l'architecture d'applications web, et Rails l'exploite, vous protègeant de certaines de ces complexités.
 
@@ -297,7 +297,7 @@ TIP. Pour arrêter le serveur, tapez Ctrl+C dans la console où il s'exécute. E
 
 La page "Welcome Aboard" est le test de base d'une nouvelle application Rails : il permet de vérifier que votre configuration permet de servir au moins cette page. Vous pouvez aussi suivre le lien _About your application’s environment_ pour une synthèse de l'environnement de votre Application.
 
-h4. Dis "Hello", Rails
+h4. Dites "Hello", Rails
 
 Pour faire dire Hello à Rails, vous devez créer au minimum un contrôleur et une vue. Heureusement, vous pouvez faire cela d'une seule commande. Tapez cette commande dans la console :
 
@@ -729,7 +729,7 @@ L'action +show+ utilise +Post.find+ pour chercher un enregistrement unique dans 
 <%= link_to 'Back', posts_path %>
 </erb>
 
-h4. Editing Posts
+h4. Edition d'un post
 
 Comme la création d'un nouveau post, l'édition est un process en 2
 parties. D'abord une requète +edit_post_path(@post)+ pour un post. Ceci appelle l'action +edit+ dans le contrôleur:
@@ -1498,14 +1498,6 @@ h3. Journal des modifications
 * January 24, 2010: Ré-écriture pour Rails 3.0 par "Mikel Lindsaar":credits.html#raasdnil
 * July 18, 2009: Nettoyage mineur en anticipation de Rails 2.3.3 by "Mike Gunderloy":credits.html#mgunderloy
 * February 15, 2009: Traduction en français pour Rails 2.3 par Jos Rozen
-* February 1, 2009: Updated for Rails 2.3 by "Mike Gunderloy":credits.html#mgunderloy
-* November 3, 2008: Formatting patch from Dave Rothlisberger
-* November 1, 2008: First approved version by "Mike Gunderloy":credits.html#mgunderloy
-* October 16, 2008: Revised based on feedback from Pratik Naik by "Mike Gunderloy":credits.html#mgunderloy (not yet approved for publication)
-* October 13, 2008: First complete draft by "Mike Gunderloy":credits.html#mgunderloy (not yet approved for publication)
-* October 12, 2008: More detail, rearrangement, editing by "Mike Gunderloy":credits.html#mgunderloy (not yet approved for publication)
-* September 8, 2008: initial version by "James Miller":credits.html#bensie (not yet approved for publication)
-
 * February 1, 2009: Mis à jour pour Rails 2.3 par "Mike Gunderloy":credits.html#mgunderloy
 * November 3, 2008: patch de formatage de Dave Rothlisberger
 * November 1, 2008: première version approuvée par "Mike Gunderloy":credits.html#mgunderloy
