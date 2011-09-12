@@ -1,6 +1,6 @@
 h2. Interface d'interrogation d'Active Record
 
-Ce guide présente différente façons d'obtenir des des données d'une base de données avec d'Active Record. En vous reportant à ce guide, vous pourrez :
+Ce guide présente différentes façons d'obtenir des données d'une base de données avec Active Record. En vous reportant à ce guide, vous pourrez :
 
 * trouver des enregistrements en utilisant plusieurs méthodes et conditions,
 * spécifier l'ordre, les attributs retournés, le groupement et d'autres propriétés des enregistrements obtenus,
@@ -45,11 +45,11 @@ class Role < ActiveRecord::Base
 end
 </ruby>
 
-Active Record effectue des requètes sur une base de données pour vous et est compatible avec la plupart des moteurs (MySQL, PostgreSQL et SQLite pour en nommer quelques-uns). Indépendamment du moteur utilisé, le format des méthodes Active Record reste le même.
+Active Record effectue des requêtes sur une base de données pour vous et est compatible avec la plupart des moteurs (MySQL, PostgreSQL et SQLite pour en nommer quelques-uns). Indépendamment du moteur utilisé, le format des méthodes Active Record reste le même.
 
 h3. Obtenir des objets depuis la base de données
 
-Pour obtenir des objets de la base de données, Active Record fournit plusieurs méthodes "finder" (de recherche). Chaque méthode accepte des arguments pour effectuer des requètes sur la base sans écrire directement du SQL.
+Pour obtenir des objets de la base de données, Active Record fournit plusieurs méthodes "finder" (de recherche). Chaque méthode accepte des arguments pour effectuer des requêtes sur la base sans écrire directement du SQL.
 
 Ces méthodes sont :
 * +where+
@@ -67,11 +67,10 @@ Ces méthodes sont :
 
 Toutes ces méthodes retournent une instance de <tt>ActiveRecord::Relation</tt>.
 
-Le fonctionnement d'une opération comme <tt>Model.find(options)</tt>
-peut-être résumé par :
+Le fonctionnement d'une opération comme <tt>Model.find(options)</tt> peut-être résumé par :
 
 * convertir les options fournies dans leur équivalent SQL,
-* exécuter la requète SQL et obtenir les resultats correspondants depuis la base,
+* exécuter la requête SQL et obtenir les résultats correspondants depuis la base,
 * instancier l'objet Ruby équivalent du modèle approprié pour chacune des rangées résultantes,
 * appeler les callbacks +after_find+ éventuels.
 
@@ -99,7 +98,7 @@ SELECT * FROM clients WHERE (clients.id = 10)
 
 h5. +first+
 
-<tt>Model.first</tt> trouve le premier enregistrement correspndant aux options. Ainsi :
+<tt>Model.first</tt> trouve le premier enregistrement correspondant aux options. Ainsi :
 
 <ruby>
 client = Client.first
@@ -116,7 +115,7 @@ SELECT * FROM clients LIMIT 1
 
 h5. +last+
 
-<tt>Model.last</tt> trouve le dernier enregistrement correspndant aux options. Ainsi :
+<tt>Model.last</tt> trouve le dernier enregistrement correspondant aux options. Ainsi :
 
 <ruby>
 client = Client.last
@@ -153,7 +152,7 @@ WARNING: <tt>Model.find(primary_key)</tt> déclenchera une exception +ActiveReco
 
 h4. Obtention de plusieurs objets par paquets
 
-Parfois vous devez parcourir un grand nombre d'enregitrements. Par exemple pour envoyer une lettre à tous les utilisateurs, pour exporter des données, etc...
+Parfois vous devez parcourir un grand nombre d'enregistrements. Par exemple pour envoyer une lettre à tous les utilisateurs, pour exporter des données, etc...
 
 Ce qui suit peut paraître tout à fait convenir à première vue:
 
@@ -170,7 +169,7 @@ C'est parce que +User.all.each+ demande a Active Record de récupérer _la table
 
 h5. +find_each+
 
-Pour parcourir efficacement une grande table, Active Record fournit une méthode de recherhe par paquets appelée +find_each+:
+Pour parcourir efficacement une grande table, Active Record fournit une méthode de recherche par paquets appelée +find_each+:
 
 <ruby>
 User.find_each do |user|
@@ -180,9 +179,7 @@ end
 
 *Configuration de la taille des paquets*
 
-Derrière le rideau +find_each+ récupère les rangées par parquets de
-+1000+ et les fournit un par un. La taille de ces paquets est
-configurable avec l'option +:batch_size+.
+Derrière le rideau +find_each+ récupère les rangées par parquets de +1000+ et les fournit un par un. La taille de ces paquets est configurable avec l'option +:batch_size+.
 
 Pour récupérer des enregistrements +User+ par paquets de +5000+, il suffit de préciser :
 
@@ -194,7 +191,7 @@ end
 
 *Début de la recherche par paquets à partir d'une clef primaire spécifique*
 
-Les enregistrements sont récupérés en ordre ascendant sur la clef primaire, qui doit être un entier. L'option +:start+ permet de configurer le premier ID de la séquence si vous ne souhaitez pas récupérer le premier. Ca peut être utile par exemple pour pouvoir reprendre un traitement interrompu s'il sauvegarde le dernier ID traité comme point de contrôle.
+Les enregistrements sont récupérés en ordre croissant sur la clef primaire, qui doit être un entier. L'option +:start+ permet de configurer le premier ID de la séquence si vous ne souhaitez pas récupérer le premier. Ca peut être utile par exemple pour pouvoir reprendre un traitement interrompu s'il sauvegarde le dernier ID traité comme point de contrôle.
 
 Pour envoyer des lettres uniquement aux utilisateurs dont la clef débute à +2000+:
 
@@ -206,11 +203,11 @@ end
 
 *Options supplémentaires*
 
-+find_each+ accept les mêmes options qu'un +find+ standard. Cependant, +:order+ et +:limit+ sont nécessaires pour des besoins interns et donc ne peuvent pas être passés explicitement.
++find_each+ accept les mêmes options qu'un +find+ standard. Cependant, +:order+ et +:limit+ sont nécessaires pour des besoins internes et donc ne peuvent pas être passés explicitement.
 
 h5. +find_in_batches+
 
-Vous pouvez aussi travailler per blocs plutôt que par rangée avec +find_in_batches+. Cette méthode est semblable à +find_each+, mais fournit des tableaux de modèles à la place :
+Vous pouvez aussi travailler par bloc plutôt que par rangée avec +find_in_batches+. Cette méthode est semblable à +find_each+, mais fournit des tableaux de modèles à la place :
 
 <ruby>
 # Works in chunks of 1000 invoices at a time.
@@ -223,7 +220,7 @@ Ce qui précède fournit des blocs de +1000+ factures à chaque fois.
 
 h3. Conditions
 
-La méthode +find+ vous permet de spécifier des conditions pour limiter les enregistrements retournés, correspondant à la partie +WHERE+ d'une requète SQL. Les conditions peuvent être spécifier en tant que string, array ou hash.
+La méthode +find+ vous permet de spécifier des conditions pour limiter les enregistrements retournés, correspondant à la partie +WHERE+ d'une requète SQL. Les conditions peuvent être spécifiées en tant que string, array ou hash.
 
 h4. Conditions en string pure
 
@@ -239,10 +236,9 @@ Et si maintenant ce nombre peut varier, fourni par exemple en tant qu'argument d
 Client.where("orders_count = ?", params[:orders])
 </ruby>
 
-Active Record utilise le premier élément des conditions et les
-éléments supplémentaires y remplacent les points d'interrogation +?+.
+Active Record utilise le premier élément des conditions et les éléments supplémentaires y remplacent les points d'interrogation +?+.
 
-Pour spécifier deux conditions, vous faîtes :
+Pour spécifier deux conditions, vous faites :
 
 <ruby>
 Client.where("orders_count = ? AND locked = ?", params[:orders], false)
@@ -262,7 +258,7 @@ plutôt que
 Client.where("orders_count = #{params[:orders]}")
 </ruby>
 
-est la sécurisation des arguments. Mettre la variable directement dans la chaîne de conditions passe la variable *tel quel*. Cela signifie que c'est une variable "unescaped" (non-échappée) directement depuis un utilisateur, dont les intentions ne sont pas connues. En faisant cela vous mettez votre base de données à risque car si un utilisateur découvre qu'il y a une faille, il, ou elle, peut l'exploiter. Ne mettez jamais un argument directement dans une chaîne conditionnelle.
+est la sécurisation des arguments. Mettre la variable directement dans la chaîne de conditions passe la variable *telle quelle*. Cela signifie que c'est une variable "unescaped" (non-échappée) directement depuis un utilisateur, dont les intentions ne sont pas connues. En faisant cela vous soumettez votre base de données à un risque car si un utilisateur découvre qu'il y a une faille, il, ou elle, peut l'exploiter. Ne mettez jamais un argument directement dans une chaîne conditionnelle.
 
 TIP: Pour plus d'information sur les dangers de l'injection SQL, consultez le "Ruby on Rails Security Guide":security.html#sql-injection.
 
