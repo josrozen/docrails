@@ -231,7 +231,7 @@ Le message d'erreur par défaut de l'assistant +validates_confirmation_of+ est "
 
 h4. +validates_exclusion_of+
 
-This helper validates that the attributes' values are not included in a given set. In fact, this set can be any enumerable object.
+Cet assistant vérifie que la valeur des attributs n'appartient pas à un ensemble donné. En l'espèce, cet ensemble cela peut être un objet énumérable.
 
 <ruby>
 class Account < ActiveRecord::Base
@@ -240,13 +240,13 @@ class Account < ActiveRecord::Base
 end
 </ruby>
 
-The +validates_exclusion_of+ helper has an option +:in+ that receives the set of values that will not be accepted for the validated attributes. The +:in+ option has an alias called +:within+ that you can use for the same purpose, if you'd like to. This example uses the +:message+ option to show how you can include the attribute's value.
+L'assistant +validates_exclusion_of+ possède une option +:in+ qui reçoit l'ensemble des valeurs qui ne seront pas autorisées pour les attributs validés. L'option +:in+ connaît un alias appelé +:within+ que vous pouvez utiliser en lieu et place si vous le préférez. L'exemple qui suit utilise l'option +:message+ pour vous montrer comment inclure la valeur de l'attribut.
 
-The default error message for +validates_exclusion_of+ is "_is reserved_".
+Le message d'erreur par défaut pour l'assistant +validates_exclusion_of+ est "_is reserved_".
 
 h4. +validates_format_of+
 
-This helper validates the attributes' values by testing whether they match a given regular expression, which is specified using the +:with+ option.
+Cet assistant vérifie que la valeur des attributs correspond à une expression régulière donnée, qui est spécifiée en utilisant l'option +:with+.
 
 <ruby>
 class Product < ActiveRecord::Base
@@ -255,11 +255,11 @@ class Product < ActiveRecord::Base
 end
 </ruby>
 
-The default error message for +validates_format_of+ is "_is invalid_".
+Le message d'erreur par défaut pour l'assistant +validates_format_of+ est "_is invalid_".
 
 h4. +validates_inclusion_of+
 
-This helper validates that the attributes' values are included in a given set. In fact, this set can be any enumerable object.
+Cet assistant vérifie que la valeur des attributs appartient à un ensemble donné. En l'espèce, cet ensemble cela peut être un objet énumérable.
 
 <ruby>
 class Coffee < ActiveRecord::Base
@@ -268,9 +268,9 @@ class Coffee < ActiveRecord::Base
 end
 </ruby>
 
-The +validates_inclusion_of+ helper has an option +:in+ that receives the set of values that will be accepted. The +:in+ option has an alias called +:within+ that you can use for the same purpose, if you'd like to. The previous example uses the +:message+ option to show how you can include the attribute's value.
+L'assistant +validates_inclusion_of+ possède une option +:in+ qui reçoit l'ensemble des valeurs qui seront autorisées pour les attributs validés. L'option +:in+ connaît un alias appelé +:within+ que vous pouvez utiliser en lieu et place si vous le préférez. L'exemple qui suit utilise l'option +:message+ pour vous montrer comment inclure la valeur de l'attribut.
 
-The default error message for +validates_inclusion_of+ is "_is not included in the list_".
+Le message d'erreur par défaut pour l'assistant +validates_inclusion_of+ est "_is reserved_".
 
 h4. +validates_length_of+
 
