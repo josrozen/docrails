@@ -5,7 +5,7 @@ Ce guide va vous enseigner la manière de pénétrer le cycle de vie des objets 
 Après avoir lu ce guide et expérimenté les concepts présentés, nous espérons que vous serez capable de :
 
 * comprendre le cycle de vie des objets <em>Active Record</em>
-* utiliser les assistants (helpers) pré-configurés de validation 
+* utiliser les assistants (helpers) prédéfinis de validation 
 * créer vos propres méthodes de validation personnalisées
 * travailler avec les messages d'erreur générés par le processus de validation
 * créer des fonctions de rappel qui réagissent aux événements du cycle de vie d'un objet
@@ -33,7 +33,7 @@ Plusieurs moyens de valider les données avant de les enregistrer dans la base s
 * Les contraintes liées à la base de données et/ou aux procédures stockées rendent les mécanismes de validation dépendants de la base de données et peuvent rendre les tests et la maintenance plus difficile. Cependant, si votre base de données est utilisée par d'autres applications, cela peut être une bonne idée d'utiliser des contraintes au niveau de la base de données. De plus, les validations qui se situent au niveau de la base de données peuvent manipuler de façon sûre certaines choses (comme l'unicité pour les tables lourdement utilisées) qui peuvent être difficiles à implémenter autrement.
 * Les validations effectuées du côté du client sont utiles mais elles s'avèrent généralement peu fiables si elles sont utilisées seules. Si elles sont implémentées en utilisant Javascript, elles peuvent être court-circuitées si le Javascript est désactivé sur le navigateur de l'utilisateur. Cependant, si elles sont combinées avec d'autres techniques, les validations effectuées du côté du client fournissent aux utilisateurs un retour immédiat lorsqu'ils utilisent votre site.
 * Les validations situées au niveau du contrôleur peuvent être attirantes mais elles deviennent souvent lourdes et difficiles à tester et à maintenir. Dans la mesure du possible, c'est une bonne idée de "garder vos contrôleurs minces" : http://weblog.jamisbuck.org/2006/10/18/skinny-controller-fat-model ce qui vous permettra de continuer à prendre du plaisir en travaillant sur votre application dans le long terme.
-* Les validations situées au niveau du modèle restent la meilleure façon de s'assurer que seules des données valides sont enregistrées dans votre base de données. Elles sont <em>agnostiques</em> (c'est-à-dire qu'elles ne dépendent pas du moteur de base de données utilisé), elles ne peuvent pas être court-circuitées par les utilisateurs finaux et restent pratiques à tester et à maintenir. Rails les rend faciles à utiliser, fournit des assistants (helpers) pré-configurés pour les besoins usuels et vous autorise également à créer vos propres méthodes de validation.
+* Les validations situées au niveau du modèle restent la meilleure façon de s'assurer que seules des données valides sont enregistrées dans votre base de données. Elles sont <em>agnostiques</em> (c'est-à-dire qu'elles ne dépendent pas du moteur de base de données utilisé), elles ne peuvent pas être court-circuitées par les utilisateurs finaux et restent pratiques à tester et à maintenir. Rails les rend faciles à utiliser, fournit des assistants (helpers) prédéfinis pour les besoins usuels et vous autorise également à créer vos propres méthodes de validation.
 
 h4. A Quel Moment survient la Validation ?
 
@@ -73,9 +73,9 @@ Les méthodes suivantes déclenchent des validations et n'enregistreront l'objet
 
 Les versions <em>bang</em> (avec le point d'exclamation à la fin, comme par exemple +save!+) soulèvent une exception si l'enregistrement est invalide. Les autres versions ne le font pas : +save+ et +update_attributes+ renvoient +false+, +create+ et +update+ renvoient juste les objets.
 
-h4. Skipping Validations
+h4. Contournement des Validations
 
-The following methods skip validations, and will save the object to the database regardless of its validity. They should be used with caution.
+Les méthodes suivantes contournent les validations et enregistreront l'objet dans la base de données, quelle que soit sa validité. Elles doivent donc être utilisées avec précaution.
 
 * +decrement!+
 * +decrement_counter+
@@ -86,13 +86,13 @@ The following methods skip validations, and will save the object to the database
 * +update_attribute+
 * +update_counters+
 
-Note that +save+ also has the ability to skip validations if passed +:validate => false+ as argument. This technique should be used with caution.
+Notez que +save+ peut également ne pas tenir compte des validations si on lui passe l'argument +:validate => false+. Cette technique doit être utilisée avec précaution.
 
 * +save(:validate => false)+
 
-h4. +valid?+ and +invalid?+
+h4. +valid?+ et +invalid?+
 
-To verify whether or not an object is valid, Rails uses the +valid?+ method. You can also use this method on your own. +valid?+ triggers your validations and returns true if no errors were added to the object, and false otherwise.
+Pour vérifier qu'un objet est valide ou non, Rails utilise la méthode +valid?+. Vous pouvez utiliser cette méthode. +valid?+ déclenche vos validations et renvoie <em>true</em> si aucune erreur n'a été ajoutée à l'objet, <em>false</em> dans le cas contraire.
 
 <ruby>
 class Person < ActiveRecord::Base
@@ -103,9 +103,9 @@ Person.create(:name => "John Doe").valid? # => true
 Person.create(:name => nil).valid? # => false
 </ruby>
 
-When Active Record is performing validations, any errors found can be accessed through the +errors+ instance method. By definition an object is valid if this collection is empty after running validations.
+Quand <em>Active Record</em> exécute les validations, n'importe quelle erreur peut être retrouvée au travers de la méthode d'instance +errors+. Par définition, un objet est valide si cette collection est vide après le lancement des validations.
 
-Note that an object instantiated with +new+ will not report errors even if it's technically invalid, because validations are not run when using +new+.
+Notez qu'un objet instancié avec la méthode +new+ ne générera aucune erreur, même s'il est techniquement invalide. Car les validations ne sont pas lancées lors de l'appel à la méthode +new+.
 
 <ruby>
 class Person < ActiveRecord::Base
@@ -137,13 +137,13 @@ end
 => ActiveRecord::RecordInvalid: Validation failed: Name can't be blank
 </ruby>
 
-+invalid?+ is simply the inverse of +valid?+. +invalid?+ triggers your validations and returns true if any errors were added to the object, and false otherwise.
++invalid?+ est simplement le contraire de +valid?+. +invalid?+ déclenche vos validations et renvoie <em>true</em> si des erreurs ont été ajoutées à l'objet, <em>false</em> dans le cas contraire.
 
 h4(#validations_overview-errors). +errors[]+
 
-To verify whether or not a particular attribute of an object is valid, you can use +errors[:attribute]+. It returns an array of all the errors for +:attribute+. If there are no errors on the specified attribute, an empty array is returned.
+Pour savoir si un attribut particulier d'un objet est valide ou non, vous pouvez utiliser +errors[:attribute]+. Cette méthode renvoie un tableau de toutes les erreurs pour l'attribut +:attribute+. S'il n'y a pas d'erreur sur l'attribut spécifié, un tableau vide est renvoyé.
 
-This method is only useful _after_ validations have been run, because it only inspects the errors collection and does not trigger validations itself. It's different from the +ActiveRecord::Base#invalid?+ method explained above because it doesn't verify the validity of the object as a whole. It only checks to see whether there are errors found on an individual attribute of the object.
+Cette méthode est uniquement utile _après_ que les validations ont été lancées car elle scrute la collection d'erreurs mais ne déclenche pas les validations elle-même. Elle diffère de la méthode +ActiveRecord::Base#invalid?+ explicitée ci-dessus en ce sens qu'elle ne vérifie pas la validité de l'objet dans son intégralité. Elle ne contrôle que les éventuelles erreurs trouvées sur l'unique attribut de l'objet.
 
 <ruby>
 class Person < ActiveRecord::Base
@@ -154,19 +154,19 @@ end
 >> Person.create.errors[:name].any? # => true
 </ruby>
 
-We'll cover validation errors in greater depth in the "Working with Validation Errors":#working-with-validation-errors section. For now, let's turn to the built-in validation helpers that Rails provides by default.
+Nous étudierons en profondeur les erreurs de validation dans la section "Working with Validation Errors":#working-with-validation-errors. Maintenant, arrêtons-nous sur les assistants pré-définis (helpers) que Rails fournit par défaut.
 
-h3. Validation Helpers
+h3. Assistants de Validation
 
-Active Record offers many pre-defined validation helpers that you can use directly inside your class definitions. These helpers provide common validation rules. Every time a validation fails, an error message is added to the object's +errors+ collection, and this message is associated with the field being validated.
+<em>Active Record</em> propose de nombreux assistants de validation prédéfinis que vous pouvez utiliser directement à l'intérieur de vos définitions de classe. Ces assistants fournissent des règles usuelles de validation. Chaque fois qu'une validation échoue, un message d'erreur est ajouté à la collection +errors+ de l'objet et ce message est associé au champ qui a été soumis à la validation.
 
-Each helper accepts an arbitrary number of attribute names, so with a single line of code you can add the same kind of validation to several attributes.
+Chaque assistant accepte un nombre déterminé de noms d'attributs. Donc avec une seule ligne de code, vous pouvez affecter la même validation à plusieurs attributs.
 
-All of them accept the +:on+ and +:message+ options, which define when the validation should be run and what message should be added to the +errors+ collection if it fails, respectively. The +:on+ option takes one of the values +:save+ (the default), +:create+  or +:update+. There is a default error message for each one of the validation helpers. These messages are used when the +:message+ option isn't specified. Let's take a look at each one of the available helpers.
+Tous les assistants acceptent les options +:on+ et +:message+ qui déterminent respectivement quand la validation doit être lancée et quel message devra être ajouté à la collection +errors+ en cas d'échec. L'option +:on+ prend une valeur parmi +:save+ (celle par défaut), +:create+ ou +:update+. Chaque assistant de validation possède son propre message d'erreur par défaut. Ces messages sont utilisés lorsque l'option +:message+ n'est pas définie. Jetons un oeil à chacun des assistants disponibles.
 
 h4. +validates_acceptance_of+
 
-Validates that a checkbox on the user interface was checked when a form was submitted. This is typically used when the user needs to agree to your application's terms of service, confirm reading some text, or any similar concept. This validation is very specific to web applications and this 'acceptance' does not need to be recorded anywhere in your database (if you don't have a field for it, the helper will just create a virtual attribute).
+Valide qu'une case à cocher sur l'interface utilisateur a bien été cochée quand le formulaire a été soumis. C'est typiquement le cas quand l'utilisateur doit accepter les termes d'utilisation d'une application, confirmer la lecture d'un texte ou n'importe quel concept similaire. Cette validation est propre aux applications web et cette 'acceptance' n'a pas besoin d'être enregistrée dans la base de données (si vous n'avez pas de champ pour elle, l'assistant créera juste un attribut virtuel).
 
 <ruby>
 class Person < ActiveRecord::Base
@@ -174,9 +174,9 @@ class Person < ActiveRecord::Base
 end
 </ruby>
 
-The default error message for +validates_acceptance_of+ is "_must be accepted_".
+Le message d'erreur par défaut pour la méthode +validates_acceptance_of+ est "_must be accepted_".
 
-+validates_acceptance_of+ can receive an +:accept+ option, which determines the value that will be considered acceptance. It defaults to "1", but you can change this.
+La méthode +validates_acceptance_of+ peut prendre en paramètres l'option +:accept+, qui détermine la valeur attendue pour que la validation se fasse. Par défaut, c'est la valeur "1", mais vous pouvez la changer.
 
 <ruby>
 class Person < ActiveRecord::Base
@@ -186,7 +186,7 @@ end
 
 h4. +validates_associated+
 
-You should use this helper when your model has associations with other models and they also need to be validated. When you try to save your object, +valid?+ will be called upon each one of the associated objects.
+Vous devriez utiliser cet assistant lorsque votre modèle possède des associations avec d'autres modèles et qu'ils nécessitent une validation. Quand vous tentez de sauvegarder votre objet, la méthode +valid?+ sera appelée pour tous les objets associés à l'objet initial.
 
 <ruby>
 class Library < ActiveRecord::Base
@@ -195,15 +195,15 @@ class Library < ActiveRecord::Base
 end
 </ruby>
 
-This validation will work with all of the association types.
+Cette validation fonctionnera avec tous les types d'associations.
 
-CAUTION: Don't use +validates_associated+ on both ends of your associations. They would call each other in an infinite loop.
+PRUDENCE : N'utilisez pas l'assistant +validates_associated+ des 2 côtés de votre association. Sinon, les assistants vont s'appeler l'un et l'autre et vous obtiendrez une boucle infinie.
 
-The default error message for +validates_associated+ is "_is invalid_". Note that each associated object will contain its own +errors+ collection; errors do not bubble up to the calling model.
+Le message d'erreur par défaut pour l'assistant +validates_associated+ est "_is invalid_". Notez que chaque objet associé contiendra sa propre collection +errors+; les erreurs ne vont pas remonter dans le modèle appelant.
 
 h4. +validates_confirmation_of+
 
-You should use this helper when you have two text fields that should receive exactly the same content. For example, you may want to confirm an email address or a password. This validation creates a virtual attribute whose name is the name of the field that has to be confirmed with "_confirmation" appended.
+Vous devriez utiliser cet assistant quand vous avez deux champs texte qui doivent recevoir exactement le même contenu. Par exemple, vous voulez confirmer une adresse e-mail ou un mot de passe. Cette validation va créer un attribut virtuel dont le nom sera le nom du champ texte qui doit être confirmé, auquel on ajoutera le suffixe "_confirmation".
 
 <ruby>
 class Person < ActiveRecord::Base
@@ -211,14 +211,14 @@ class Person < ActiveRecord::Base
 end
 </ruby>
 
-In your view template you could use something like
+Dans le gabarit de votre vue, vous devriez utiliser quelque chose comme
 
 <erb>
 <%= text_field :person, :email %>
 <%= text_field :person, :email_confirmation %>
 </erb>
 
-This check is performed only if +email_confirmation+ is not +nil+. To require confirmation, make sure to add a presence check for the confirmation attribute (we'll take a look at +validates_presence_of+ later on this guide):
+Ce test n'est exécute que si +email_confirmation+ n'est pas +nil+. Pour rendre la confirmation obligatoire, ajoutez un test de présence pour l'attribut de confirmation (nous verrons plus loin dans ce guide le détail de l'assistant +validates_presence_of+) :
 
 <ruby>
 class Person < ActiveRecord::Base
@@ -227,7 +227,7 @@ class Person < ActiveRecord::Base
 end
 </ruby>
 
-The default error message for +validates_confirmation_of+ is "_doesn't match confirmation_".
+Le message d'erreur par défaut de l'assistant +validates_confirmation_of+ est "_doesn't match confirmation_".
 
 h4. +validates_exclusion_of+
 
@@ -1206,7 +1206,7 @@ The +after_commit+ and +after_rollback+ callbacks are guaranteed to be called fo
 
 h3. Changelog
 
-* February 17, 2011: Add description of transaction callbacks.
+* 17 Février, 2011: Add description of transaction callbacks.
 * July 20, 2010: Fixed typos and rephrased some paragraphs for clarity. "Jaime Iniesta":http://jaimeiniesta.com
 * May 24, 2010: Fixed document to validate XHTML 1.0 Strict. "Jaime Iniesta":http://jaimeiniesta.com
 * May 15, 2010: Validation Errors section updated by "Emili Parreño":http://www.eparreno.com
